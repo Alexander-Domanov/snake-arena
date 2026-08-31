@@ -1,178 +1,180 @@
 # AI Usage Report — Interview Canvas
 
-Дата: 2026-08-31
-Проект: Interview Canvas — collaborative whiteboard для system design интервью
-Стек: HTML/CSS/JS (фронтенд), FastAPI + SQLAlchemy + SQLite (бэкенд), OpenAPI 3.0, pytest, uv
+Date: 2026-08-31
+Project: Interview Canvas — collaborative whiteboard for system design interviews
+Stack: HTML/CSS/JS (frontend), FastAPI + SQLAlchemy + SQLite (backend), OpenAPI 3.0, pytest, uv
 
-Этот отчёт описывает, как AI-ассистент использовался на каждом этапе разработки
-проекта, какие решения и ошибки возникали, и какую долю работы выполнил AI.
-
----
-
-## 1. Как AI использовался на каждом этапе
-
-| Этап | Роль AI | Результат |
-|------|---------|-----------|
-| Спецификация | Не участвовал (входные данные) | `product-spec.md` существовал до начала работы |
-| Фронтенд-прототип | Написание всего кода, проверка в браузере | `frontend/` — index.html, style.css, app.js (Miro-подобный UI, drag-and-drop, редактирование стикеров) |
-| OpenAPI-спецификация | Проектирование схем, написание и валидация | `openapi.yaml` — 4 эндпоинта, компоненты, примеры |
-| Бэкенд | Проектирование структуры, реализация, запуск | `backend/` — FastAPI, SQLAlchemy, SQLite |
-| Тесты | Написание юнит- и интеграционных тестов | `tests/` — 30 тестов, все проходят |
-| Интеграция | Переписывание фронтенда на реальный API, CORS, отладка | Frontend ↔ backend через REST, обработка ошибок |
-| Git | Коммиты после каждого этапа | 6 коммитов, чистая история |
-
-### Подробнее по этапам
-
-1. **Спецификация** — `product-spec.md` (пользовательские истории, acceptance criteria,
-   non-goals) был предоставлен готовым. AI использовал его как источник требований.
-
-2. **Фронтенд-прототип** — AI создал одностраничный прототип без фреймворков:
-   доска с точечной сеткой, тулбар с тремя кнопками, элементы (стикер/прямоугольник/круг),
-   drag-and-drop на pointer events, кнопка удаления, редактирование текста стикера по
-   двойному клику. Прототип проверялся в реальном браузере (автоматизированный прогон
-   сценариев: создание, перетаскивание, редактирование, удаление).
-
-3. **OpenAPI 3.0** — по требованиям пользователя описаны схемы Board/Element/ElementCreate,
-   компоненты для переиспользования (параметры путей, ответы 404/422), примеры запросов
-   и ответов. Спецификация провалидирована официальным валидатором и дополнительным
-   скриптом проверки соответствия примеров схемам.
-
-4. **Бэкенд** — реализованы 4 эндпоинта из спецификации. Решения:
-   - `backend/schemas.py` добавлен как отдельный слой pydantic-контрактов (в ТЗ его не было,
-     но разделение ORM/API-схем чище);
-   - uuid в путях валидируется аннотацией `uuid.UUID` (мусорный id → 422);
-   - даты сериализуются в формат из openapi.yaml (`2026-08-31T10:15:30Z`);
-   - `selectinload` для загрузки элементов (защита от DetachedInstanceError);
-   - тесты изолированы через dependency override (in-memory SQLite).
-
-5. **Тесты** — 10 юнит-тестов моделей/схем + 20 интеграционных тестов API:
-   201/204/404/422, enum, uuid, каскадное удаление, формат дат.
-
-6. **Интеграция** — фронтенд переписан с моков на REST: создание доски при загрузке,
-   POST/DELETE элементов, перезагрузка доски после каждой мутации (сервер — источник
-   истины), CORS middleware, баннер ошибок, логирование 404.
-
-7. **Git** — AI делал коммиты после каждого осмысленного шага (по правилу из AGENTS.md).
+This report describes how the AI assistant was used at each stage of the project,
+which decisions and issues came up, and what share of the work the AI performed.
 
 ---
 
-## 2. Ключевые промпты
+## 1. How AI was used at each stage
 
-Приведены кратко (формулировки пользователя):
+| Stage | AI role | Result |
+|-------|---------|--------|
+| Specification | Not involved (input data) | `product-spec.md` existed before the work began |
+| Frontend prototype | Wrote all the code, verified in a real browser | `frontend/` — index.html, style.css, app.js (Miro-like UI, drag-and-drop, sticky note editing) |
+| OpenAPI spec | Designed schemas, wrote and validated the spec | `openapi.yaml` — 4 endpoints, reusable components, examples |
+| Backend | Designed structure, implemented, ran the server | `backend/` — FastAPI, SQLAlchemy, SQLite |
+| Tests | Wrote unit and integration tests | `tests/` — 30 tests, all passing |
+| Integration | Rewrote the frontend to use the real API, CORS, debugging | Frontend ↔ backend over REST, error handling |
+| Git | Committed after every stage | 6 commits, clean history |
 
-1. «Прочитай product-spec.md. Создай фронтенд-прототип для Interview Canvas… чисты HTML+CSS+JS,
-   панель инструментов, drag-and-drop, удаление, стили как в Miro, работа без сервера».
-2. «Прочитай product-spec.md. Опиши REST API в формате OpenAPI 3.0… эндпоинты, схемы,
-   компоненты, примеры, без авторизации».
-3. «Прочитай product-spec.md и openapi.yaml. Реализуй бэкенд на FastAPI с SQLite и
-   SQLAlchemy… структура backend/, зависимости через uv, 404/422/201/204, тесты,
-   обнови AGENTS.md, проверь запуск сервера и pytest, коммить после каждого изменения».
-4. «Обнови фронтенд, чтобы он использовал реальный бэкенд вместо моков… создание доски
-   при загрузке, POST/DELETE, обработка ошибок (alert/сообщение, 404 в консоль),
-   базовый URL localhost:8000, добавь CORS, проверь в браузере, закоммить».
+### Stage details
 
-Все промпты были на русском, с чёткими требованиями и acceptance-критериями.
+1. **Specification** — `product-spec.md` (user stories, acceptance criteria,
+   non-goals) was provided as-is. The AI used it as the source of requirements.
 
----
+2. **Frontend prototype** — the AI built a framework-free single-page prototype:
+   a board with a dot grid, a toolbar with three buttons, elements (sticky note /
+   rectangle / circle), pointer-event drag-and-drop, a delete button, and sticky
+   note text editing on double-click. The prototype was verified in a real browser
+   (automated run-through: create, drag, edit, delete).
 
-## 3. Исправленные баги
+3. **OpenAPI 3.0** — per the user's requirements, Board/Element/ElementCreate
+   schemas were described, with reusable components (path parameters, 404/422
+   responses) and request/response examples. The spec was validated with the
+   official validator plus a custom script checking that examples match schemas.
 
-| # | Баг | Когда найден | Причина | Исправление |
-|---|-----|-------------|---------|-------------|
-| 1 | Элементы схлопывались до размера текста (стикер был ~24px вместо 160x160) | Фронтенд-прототип, при проверке в браузере | В CSS у `.sticky/.rect/.circle` не были заданы width/height, absolute-позиционирование сжимает по контенту | Явные размеры в CSS; позиционирование по offsetWidth/offsetHeight |
-| 2 | Ошибка 422 при добавлении элемента | Интеграция, E2E-проверка | Фронтенд отправлял `type: "sticky"` вместо `"sticky_note"` (ключи кнопок ≠ типы API) | Маппинг API_TYPE: sticky→sticky_note, rect→rectangle |
-| 3 | Баннер ошибок показывал «[object Object]» | Интеграция, E2E-проверка | FastAPI отдаёт 422 detail массивом, шаблонная строка приводила объект к строке | Хелпер errorDetail (msg первой ошибки) |
-| 4 | Новые элементы ложились ровно друг на друга | Интеграция, E2E-проверка | Счётчик каскада сбрасывался при перезагрузке доски после каждой мутации | Сдвиг от центра считается от `elements.length` (детерминированно) |
-| 5 | CORS блокировал запросы с file://-страницы | Интеграция | Не было middleware на бэкенде | CORSMiddleware allow_origins=["*"] + проверка префлайтов OPTIONS |
-| 6 | (Проактивно) DetachedInstanceError при сериализации | Бэкенд | Ленивая загрузка relationship после закрытия сессии | `selectinload` в get_board |
+4. **Backend** — the 4 endpoints from the spec were implemented. Decisions:
+   - `backend/schemas.py` was added as a separate pydantic contract layer (it was
+     not in the original structure, but separating ORM from API schemas is cleaner);
+   - uuid path parameters are validated via the `uuid.UUID` annotation (garbage id → 422);
+   - dates are serialized in the format from openapi.yaml (`2026-08-31T10:15:30Z`);
+   - `selectinload` for loading elements (protection against DetachedInstanceError);
+   - tests are isolated via dependency override (in-memory SQLite).
 
-Плюс мелкие решения-«не баги»: системный Python 3.9 не подходил → uv сам скачал
-управляемый 3.11; sqlite не добавлялся в зависимости (встроенный модуль).
+5. **Tests** — 10 unit tests for models/schemas + 20 API integration tests:
+   201/204/404/422, enum, uuid, cascade delete, date format.
 
----
+6. **Integration** — the frontend was rewritten from mocks to REST: create a board
+   on page load, POST/DELETE elements, reload the board after every mutation (the
+   server is the source of truth), CORS middleware, error banner, 404 console logging.
 
-## 4. Уроки
-
-1. **Контракт — источник истины, но его надо соблюдать буквально.** openapi.yaml
-   описывает `sticky_note`, а фронтенд отправил `sticky`. Спецификация не защищает
-   от опечаток — защищает проверка enum и E2E-тесты.
-2. **E2E-проверка в браузере ловит то, что не видно при чтении кода.** Баги 1–4
-   найдены автоматизированным прогоном сценариев, а не статическим анализом.
-   «Проверено, а не написано» — принцип, который экономит время.
-3. **Сервер — источник истины: клиент держим «глупым».** После каждой мутации
-   перезагружаем доску с сервера. Это проще, чем синхронизировать локальное состояние,
-   и автоматически ловит изменения от других участников (важно для будущего WebSocket).
-4. **Разделяй слои: pydantic-схемы ≠ ORM-модели.** Отдельный `schemas.py` позволил
-   менять API-контракт, не трогая модели, и наоборот.
-5. **Ошибки проектируй осознанно.** 404 → лог в консоль (тихая деградация),
-   сервер недоступен → видимый баннер. Разное поведение для разных классов ошибок
-   — осознанное решение, а не случайность.
-6. **Ограничения API лучше документировать, чем маскировать.** Перетаскивание и
-   правка текста стикера живут только в DOM, потому что в API нет update-эндпоинта.
-   Это явно отмечено — следующий шаг (PATCH) очевиден.
-7. **Коммиты после каждого этапа** дают чистую историю и точку отката: 6 коммитов,
-   каждый самодостаточен.
+7. **Git** — the AI committed after each meaningful step (per the AGENTS.md rule).
 
 ---
 
-## 5. Оценка вклада AI и человека
+## 2. Key prompts
 
-| Этап | AI | Человек | Комментарий |
-|------|----|---------|-------------|
-| Спецификация | 0% | 100% | product-spec.md создан человеком до сессии |
-| Фронтенд-прототип | 90% | 10% | Требования и стиль (Miro) — человек, код — AI |
-| OpenAPI-спецификация | 90% | 10% | Структура эндпоинтов задана человеком, схема/валидация — AI |
-| Бэкенд | 90% | 10% | Структура файлов — из ТЗ, реализация — AI |
-| Тесты | 95% | 5% | Написаны и прогнаны AI |
-| Интеграция | 85% | 15% | Чёткие требования + инструкция по CORS — человек, отладка — AI |
-| **Итого** | **≈ 85%** | **≈ 15%** | Оценка по объёму работы и значимости вклада |
+Shown briefly (user's wording):
 
-Оценка грубая. Человек отвечал за направление (что строим, какие требования,
-какой стиль), AI — за реализацию, проверку и отладку. Без качественных требований
-и существующей спецификации доля AI была бы ниже.
+1. "Read product-spec.md. Create a frontend prototype for Interview Canvas…
+   plain HTML+CSS+JS, toolbar, drag-and-drop, delete, Miro-like styles, works
+   without a server."
+2. "Read product-spec.md. Describe the REST API in OpenAPI 3.0 format…
+   endpoints, schemas, components, examples, no auth."
+3. "Read product-spec.md and openapi.yaml. Implement the backend with FastAPI,
+   SQLite and SQLAlchemy… backend/ structure, dependencies via uv, 404/422/201/204,
+   tests, update AGENTS.md, verify the server starts and pytest passes, commit
+   after every change."
+4. "Update the frontend to use the real backend instead of mocks… create a board
+   on load, POST/DELETE, error handling (alert/message, 404 to console),
+   base URL localhost:8000, add CORS, verify in the browser, commit."
 
----
-
-## 6. Оценка времени
-
-**Фактическое время (измерено по таймстампам файлов и git-коммитов):**
-
-- Первый файл проекта: `product-spec.md` — создан 2026-08-31 18:36:37
-- Последнее изменение: `docs/ai-usage-report.md` — создан 2026-08-31 19:03:27;
-  последний коммит `3603df4` — 2026-08-31 19:03:30
-- **Итого от первого файла до последнего коммита: ≈ 27 минут**
-
-Этапы по таймстампам коммитов:
-
-| Коммит | Время | Этап |
-|--------|-------|------|
-| dc8bad2 | 18:48:59 | Фронтенд-прототип + OpenAPI + .gitignore |
-| 8e47d10 | 18:50:35 | Бэкенд (FastAPI + SQLite) |
-| 404d07b | 18:56:15 | Тесты + AGENTS.md |
-| f4a4453, f03f29b | 19:02:04 | Интеграция фронтенда с API (CORS, POST/DELETE) |
-| 3603df4 | 19:03:30 | AI-usage report |
-
-Примечание о расхождении с прежней оценкой: в первой версии отчёта стояла
-примерная оценка «2.5–3 часа» — по объёму выполненной работы. Фактические
-таймстампы файлов и коммитов дают промежуток ≈ 27 минут. Разница объясняется
-тем, что таймстампы фиксируют только момент создания/изменения файлов и
-коммитов (то есть работу AI-ассистента в этой сессии). Время человека на
-подготовку — обдумывание, написание `product-spec.md`, постановку задач —
-в измеренный промежуток не входит.
+All prompts were in Russian, with clear requirements and acceptance criteria.
 
 ---
 
-## 7. Место для ручных правок
+## 3. Bugs fixed
 
-Ниже — поля для уточнений человеком. Заполнить при необходимости:
+| # | Bug | Found when | Cause | Fix |
+|---|-----|-----------|-------|-----|
+| 1 | Elements collapsed to text size (sticky was ~24px instead of 160x160) | Frontend prototype, browser verification | `.sticky/.rect/.circle` had no width/height in CSS; absolute positioning shrinks to content | Explicit sizes in CSS; positioning via offsetWidth/offsetHeight |
+| 2 | 422 error when adding an element | Integration, E2E check | Frontend sent `type: "sticky"` instead of `"sticky_note"` (toolbar keys ≠ API types) | API_TYPE mapping: sticky→sticky_note, rect→rectangle |
+| 3 | Error banner showed "[object Object]" | Integration, E2E check | FastAPI returns 422 `detail` as an array; template literal stringified the object | errorDetail helper (msg of the first error) |
+| 4 | New elements stacked exactly on top of each other | Integration, E2E check | Cascade counter reset after every board reload | Offset from center computed from `elements.length` (deterministic) |
+| 5 | CORS blocked requests from a file:// page | Integration | No middleware on the backend | CORSMiddleware allow_origins=["*"] + preflight OPTIONS verified |
+| 6 | (Proactively) DetachedInstanceError during serialization | Backend | Lazy relationship loading after session close | `selectinload` in get_board |
 
-- [x] Уточнить оценку вклада (раздел 5), если мнение отличается
-- [x] Добавить реальные трудозатраты, если замерялись (раздел 6 — измерено по таймстампам, ≈ 27 мин)
-- [ ] Добавить время подготовки человека (написание product-spec.md, постановка задач) — в таймстампах не фиксируется
-- [ ] Дополнить раздел 2 полными текстами промптов
-- [ ] Указать, какие решения человек хочет пересмотреть
+Plus minor non-bug decisions: system Python 3.9 was too old → uv downloaded a
+managed Python 3.11 itself; sqlite was not added to dependencies (stdlib module).
 
 ---
 
-*Отчёт сгенерирован AI-ассистентом на основе фактической истории работы
-(коммиты, файлы, результаты проверок).*
+## 4. Lessons learned
+
+1. **The contract is the source of truth, but it must be honored literally.**
+   openapi.yaml says `sticky_note`, but the frontend sent `sticky`. A spec does not
+   protect against typos — enum validation and E2E tests do.
+2. **E2E verification in a real browser catches what code reading misses.**
+   Bugs 1–4 were found by an automated scenario run, not by static analysis.
+   "Verified, not just written" saves time.
+3. **The server is the source of truth: keep the client dumb.** After every
+   mutation, reload the board from the server. Simpler than syncing local state,
+   and it automatically picks up changes from other participants (important for
+   the future WebSocket module).
+4. **Separate layers: pydantic schemas ≠ ORM models.** A dedicated `schemas.py`
+   lets you change the API contract without touching models and vice versa.
+5. **Design error behavior deliberately.** 404 → console log (quiet degradation),
+   server down → visible banner. Different behavior for different error classes is
+   a conscious decision, not an accident.
+6. **Document API limitations instead of masking them.** Dragging and sticky note
+   text edits live only in the DOM because the API has no update endpoint. This is
+   stated explicitly — the next step (PATCH) is obvious.
+7. **Committing after every stage** gives a clean history and rollback points:
+   6 commits, each self-contained.
+
+---
+
+## 5. AI and human contribution estimate
+
+| Stage | AI | Human | Comment |
+|-------|----|-------|---------|
+| Specification | 0% | 100% | product-spec.md created by the human before the session |
+| Frontend prototype | 90% | 10% | Requirements and style (Miro) — human, code — AI |
+| OpenAPI spec | 90% | 10% | Endpoint structure set by the human, schemas/validation — AI |
+| Backend | 90% | 10% | File structure from the spec, implementation — AI |
+| Tests | 95% | 5% | Written and run by AI |
+| Integration | 85% | 15% | Detailed requirements + CORS instruction — human, debugging — AI |
+| **Total** | **≈ 85%** | **≈ 15%** | Rough estimate by volume and significance of contribution |
+
+The estimate is rough. The human owned the direction (what to build, requirements,
+style); the AI owned implementation, verification and debugging. Without solid
+requirements and the existing spec, the AI share would have been lower.
+
+---
+
+## 6. Time estimate
+
+**Actual time (measured from file and git commit timestamps):**
+
+- First project file: `product-spec.md` — created 2026-08-31 18:36:37
+- Last change: `docs/ai-usage-report.md` — created 2026-08-31 19:03:27;
+  last commit `3603df4` — 2026-08-31 19:03:30
+- **Total from the first file to the last commit: ≈ 27 minutes**
+
+Stages by commit timestamps:
+
+| Commit | Time | Stage |
+|--------|------|-------|
+| dc8bad2 | 18:48:59 | Frontend prototype + OpenAPI + .gitignore |
+| 8e47d10 | 18:50:35 | Backend (FastAPI + SQLite) |
+| 404d07b | 18:56:15 | Tests + AGENTS.md |
+| f4a4453, f03f29b | 19:02:04 | Frontend–API integration (CORS, POST/DELETE) |
+| 3603df4 | 19:03:30 | AI usage report |
+
+Note on the discrepancy with the earlier estimate: the first version of this
+report used a rough "2.5–3 hours" figure — based on the volume of work. Actual
+file and commit timestamps give ≈ 27 minutes. The difference is explained by the
+fact that timestamps only record when files/commits were created (i.e. the AI
+assistant's work in this session). The human's preparation time — thinking,
+writing `product-spec.md`, formulating tasks — is not captured by timestamps.
+
+---
+
+## 7. Manual edits
+
+Fields below are for the human to refine. Fill in as needed:
+
+- [x] Adjust the contribution estimate (section 5) if you disagree
+- [x] Add real effort figures if measured (section 6 — measured from timestamps, ≈ 27 min)
+- [ ] Add the human's preparation time (writing product-spec.md, formulating tasks) — not captured by timestamps
+- [ ] Add full prompt texts to section 2
+- [ ] Note any decisions the human wants to revisit
+
+---
+
+*Report generated by the AI assistant based on the actual work history
+(commits, files, verification results).*
