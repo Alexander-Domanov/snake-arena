@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interview Canvas</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-name">Interview Canvas</span>
+    </div>
+    <div class="toolbar-divider" aria-hidden="true"></div>
+    <div class="tools" role="group" aria-label="Add elements">
+      <button id="btn-sticky" class="tool-btn" type="button" title="Add sticky note">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="2" y="2" width="12" height="12" rx="1.5" fill="#FEF448" stroke="#C9A800" stroke-width="1.2"/>
+          <path d="M10 2v3.5h3.5" fill="#FFF9B0" stroke="#C9A800" stroke-width="1.2"/>
+        </svg>
+        <span>Add sticky note</span>
+      </button>
+      <button id="btn-rect" class="tool-btn" type="button" title="Add rectangle">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <span>Add rectangle</span>
+      </button>
+      <button id="btn-circle" class="tool-btn" type="button" title="Add circle">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <span>Add circle</span>
+      </button>
+    </div>
+    <div class="toolbar-spacer" aria-hidden="true"></div>
+    <div class="toolbar-hint">Double-click a sticky note to edit its text</div>
+  </header>
+
+  <main id="board">
+    <div id="empty-hint" class="empty-hint">
+      <p class="empty-hint-title">Board is empty</p>
+      <p class="empty-hint-sub">Pick a tool above to add a sticky note, rectangle or circle</p>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

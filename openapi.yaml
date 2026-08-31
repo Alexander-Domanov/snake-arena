@@ -1,0 +1,415 @@
+openapi: 3.0.3
+info:
+  title: Interview Canvas API
+  description: |
+    REST API for Interview Canvas — a collaborative whiteboard for system
+    design interviews (Module 2 MVP).
+
+    Scope of this version:
+      * boards are public by link — no authentication
+      * elements are sticky notes and basic shapes (no free drawing)
+      * no real-time updates — clients poll GET /boards/{board_id}
+      * no undo/redo
+
+    WebSocket collaboration will be added in Module 3.
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server (FastAPI)
+
+tags:
+  - name: boards
+    description: Board lifecycle and read access
+  - name: elements
+    description: Elements on a board (sticky notes and shapes)
+
+paths:
+  /boards:
+    post:
+      tags:
+        - boards
+      summary: Create a board
+      description: Creates a new empty board. The client receives a unique board id to share with other participants.
+      operationId: createBoard
+      requestBody:
+        required: false
+        description: Optional board name. May be an empty object.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BoardCreate'
+            examples:
+              default:
+                summary: Default (no name)
+                value: {}
+              named:
+                summary: Named board
+                value:
+                  name: Rate limiter design
+      responses:
+        '201':
+          description: Board created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Board'
+              examples:
+                created:
+                  summary: New empty board
+                  value:
+                    id: 7f3a2c9e-4b1d-4f6a-9c2e-8d5b1a0e3f77
+                    name: Rate limiter design
+                    created_at: '2026-08-31T10:15:30Z'
+                    elements: []
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /boards/{board_id}:
+    parameters:
+      - $ref: '#/components/parameters/BoardIdPath'
+    get:
+      tags:
+        - boards
+      summary: Get a board
+      description: Returns the board with all elements currently stored on it.
+      operationId: getBoard
+      responses:
+        '200':
+          description: Board with all its elements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Board'
+              examples:
+                board-with-elements:
+                  summary: Board with three elements
+                  value:
+                    id: 7f3a2c9e-4b1d-4f6a-9c2e-8d5b1a0e3f77
+                    name: Rate limiter design
+                    created_at: '2026-08-31T10:15:30Z'
+                    elements:
+                      - id: a1b2c3d4-1111-2222-3333-444455556666
+                        board_id: 7f3a2c9e-4b1d-4f6a-9c2e-8d5b1a0e3f77
+                        type: sticky_note
+                        x: 120
+                        y: 80
+                        width: 160
+                        height: 160
+                        text: API Gateway
+                        created_at: '2026-08-31T10:16:05Z'
+                      - id: b2c3d4e5-2222-3333-4444-555566667777
+                        board_id: 7f3a2c9e-4b1d-4f6a-9c2e-8d5b1a0e3f77
+                        type: rectangle
+                        x: 360
+                        y: 90
+                        width: 180
+                        height: 110
+                        text: null
+                        created_at: '2026-08-31T10:16:12Z'
+                      - id: c3d4e5f6-3333-4444-5555-666677778888
+                        board_id: 7f3a2c9e-4b1d-4f6a-9c2e-8d5b1a0e3f77
+                        type: circle
+                        x: 620
+                        y: 90
+                        width: 130
+                        height: 130
+                        text: null
+                        created_at: '2026-08-31T10:16:18Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /boards/{board_id}/elements:
+    post:
+      tags:
+        - elements
+      summary: Add an element
+      description: Adds a sticky note or a shape to the board.
+      operationId: addElement
+      parameters:
+        - $ref: '#/components/parameters/BoardIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ElementCreate'
+            examples:
+              sticky-note:
+                summary: Sticky note with text
+                value:
+                  type: sticky_note
+                  x: 120
+                  y: 80
+                  width: 160
+                  height: 160
+                  text: API Gateway
+              rectangle:
+                summary: Rectangle without text
+                value:
+                  type: rectangle
+                  x: 360
+                  y: 90
+                  width: 180
+                  height: 110
+              circle:
+                summary: Circle (width == height)
+                value:
+                  type: circle
+                  x: 620
+                  y: 90
+                  width: 130
+                  height: 130
+      responses:
+        '201':
+          description: Element created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Element'
+              examples:
+                sticky-note:
+                  summary: Created sticky note
+                  value:
+                    id: a1b2c3d4-1111-2222-3333-444455556666
+                    board_id: 7f3a2c9e-4b1d-4f6a-9c2e-8d5b1a0e3f77
+                    type: sticky_note
+                    x: 120
+                    y: 80
+                    width: 160
+                    height: 160
+                    text: API Gateway
+                    created_at: '2026-08-31T10:16:05Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /elements/{element_id}:
+    delete:
+      tags:
+        - elements
+      summary: Delete an element
+      description: Deletes an element from its board. The element is removed for all participants.
+      operationId: deleteElement
+      parameters:
+        - $ref: '#/components/parameters/ElementIdPath'
+      responses:
+        '204':
+          description: Element deleted (no content)
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    BoardIdPath:
+      name: board_id
+      in: path
+      required: true
+      description: Board id returned by POST /boards.
+      schema:
+        type: string
+        format: uuid
+        example: 7f3a2c9e-4b1d-4f6a-9c2e-8d5b1a0e3f77
+    ElementIdPath:
+      name: element_id
+      in: path
+      required: true
+      description: Element id returned by POST /boards/{board_id}/elements.
+      schema:
+        type: string
+        format: uuid
+        example: a1b2c3d4-1111-2222-3333-444455556666
+
+  responses:
+    NotFound:
+      description: The requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            board-not-found:
+              summary: Unknown board
+              value:
+                detail: Board not found
+            element-not-found:
+              summary: Unknown element
+              value:
+                detail: Element not found
+    ValidationError:
+      description: Request body does not match the schema.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+          examples:
+            invalid-type:
+              summary: Invalid element type
+              value:
+                detail:
+                  - loc:
+                      - body
+                      - type
+                    msg: "value is not a valid enumeration member; permitted: 'sticky_note', 'rectangle', 'circle'"
+                    type: type_error.enum
+
+  schemas:
+    Board:
+      type: object
+      description: A collaborative whiteboard identified by id.
+      required:
+        - id
+        - created_at
+        - elements
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique board id, shared by link.
+        name:
+          type: string
+          nullable: true
+          maxLength: 120
+          description: Optional human-readable board name.
+        created_at:
+          type: string
+          format: date-time
+          description: Board creation time (UTC).
+        elements:
+          type: array
+          description: All elements currently on the board.
+          items:
+            $ref: '#/components/schemas/Element'
+
+    BoardCreate:
+      type: object
+      description: Payload for creating a board. May be empty.
+      properties:
+        name:
+          type: string
+          nullable: true
+          maxLength: 120
+          description: Optional board name.
+
+    Element:
+      type: object
+      description: An element stored on a board.
+      required:
+        - id
+        - board_id
+        - type
+        - x
+        - y
+        - width
+        - height
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique element id.
+        board_id:
+          type: string
+          format: uuid
+          description: Id of the board this element belongs to.
+        type:
+          $ref: '#/components/schemas/ElementType'
+        x:
+          type: number
+          description: Horizontal position of the element's top-left corner on the canvas.
+        y:
+          type: number
+          description: Vertical position of the element's top-left corner on the canvas.
+        width:
+          type: number
+          minimum: 1
+          description: Element width in canvas units.
+        height:
+          type: number
+          minimum: 1
+          description: Element height in canvas units.
+        text:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Sticky note content. Null for shapes.
+        created_at:
+          type: string
+          format: date-time
+          description: Element creation time (UTC).
+
+    ElementCreate:
+      type: object
+      description: Payload for adding an element to a board.
+      required:
+        - type
+        - x
+        - y
+        - width
+        - height
+      properties:
+        type:
+          $ref: '#/components/schemas/ElementType'
+        x:
+          type: number
+          description: Horizontal position of the element's top-left corner on the canvas.
+        y:
+          type: number
+          description: Vertical position of the element's top-left corner on the canvas.
+        width:
+          type: number
+          minimum: 1
+          description: Element width in canvas units.
+        height:
+          type: number
+          minimum: 1
+          description: Element height in canvas units.
+        text:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Sticky note content. Omit for shapes.
+
+    ElementType:
+      type: string
+      description: |
+        Element kind. For `circle`, width and height should be equal.
+      enum:
+        - sticky_note
+        - rectangle
+        - circle
+
+    Error:
+      type: object
+      description: Standard error body (matches FastAPI HTTPException).
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          example: Board not found
+
+    ValidationError:
+      type: object
+      description: Validation error body (matches FastAPI/pydantic 422 response).
+      required:
+        - detail
+      properties:
+        detail:
+          type: array
+          description: One entry per invalid field.
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                description: Path to the invalid field.
+                items:
+                  type: string
+              msg:
+                type: string
+                description: Human-readable error message.
+              type:
+                type: string
+                description: Error type identifier.
