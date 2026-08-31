@@ -6,6 +6,8 @@
   const board = document.getElementById('board');
   const emptyHint = document.getElementById('empty-hint');
   const errorBanner = document.getElementById('error-banner');
+  const boardLink = document.getElementById('board-link');
+  const copyBtn = document.getElementById('btn-copy-link');
 
   const buttons = {
     sticky: document.getElementById('btn-sticky'),
@@ -88,12 +90,70 @@
     const data = await api('/boards', { method: 'POST' }); // без тела, как в ТЗ
     boardId = data.id;
     board.dataset.boardId = boardId; // удобно для отладки и тестов
+    syncUrlWithBoard();
   }
 
   async function loadBoard() {
     const data = await api(`/boards/${boardId}`);
     elements = data.elements;
     renderAll();
+    renderShareInfo();
+  }
+
+  // ---------- доска по ссылке (?board=<id>) ----------
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  function boardIdFromUrl() {
+    const id = new URLSearchParams(window.location.search).get('board');
+    return id && UUID_RE.test(id) ? id : null;
+  }
+
+  function syncUrlWithBoard() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('board', boardId);
+    url.hash = '';
+    window.history.replaceState(null, '', url.toString());
+  }
+
+  function clearBoardIdFromUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('board');
+    window.history.replaceState(null, '', url.toString());
+  }
+
+  function shareUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('board', boardId);
+    url.hash = '';
+    return url.toString();
+  }
+
+  function renderShareInfo() {
+    const value = boardId ? shareUrl() : '';
+    if (boardLink) boardLink.value = value;
+    if (copyBtn) copyBtn.disabled = !boardId;
+  }
+
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const value = shareUrl();
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch (_) {
+        // Clipboard API недоступна (http/file, старые браузеры) — fallback через execCommand
+        try {
+          const tmp = document.createElement('textarea');
+          tmp.value = value;
+          document.body.appendChild(tmp);
+          tmp.select();
+          document.execCommand('copy');
+          tmp.remove();
+        } catch (_) {
+          /* пользователь скопирует ссылку из поля вручную */
+        }
+      }
+    });
   }
 
   // ---------- мутации (после каждой — перезагрузка доски с сервера) ----------
@@ -308,14 +368,40 @@
     btn.addEventListener('click', () => addElementToServer(type));
   });
 
-  // ---------- init: создать доску и загрузить элементы ----------
+  // ---------- init: присоединиться по ссылке (?board=<id>) или создать новую доску ----------
 
   (async function init() {
-    try {
-      await createBoard();
-      await loadBoard();
-    } catch (err) {
-      handleApiError(err, 'Создание доски');
+    const joinId = boardIdFromUrl();
+    if (joinId) {
+      // пользователь открыл ссылку на существующую доску — не создаём новую
+      boardId = joinId;
+      board.dataset.boardId = joinId;
+      try {
+        await loadBoard();
+      } catch (err) {
+        if (err && err.status === 404) {
+          // доски с таким id нет — показываем ошибку и создаём новую
+          showError(`Доска ${joinId} не найдена. Создана новая доска.`);
+          boardId = null;
+          delete board.dataset.boardId;
+          clearBoardIdFromUrl();
+          try {
+            await createBoard();
+            await loadBoard();
+          } catch (err2) {
+            handleApiError(err2, 'Создание доски');
+          }
+        } else {
+          handleApiError(err, 'Загрузка доски');
+        }
+      }
+    } else {
+      try {
+        await createBoard();
+        await loadBoard();
+      } catch (err) {
+        handleApiError(err, 'Создание доски');
+      }
     }
   })();
 })();

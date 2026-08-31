@@ -117,6 +117,31 @@ body {
   flex: 1;
 }
 
+.share {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.board-link {
+  width: 280px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fafafa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  outline: none;
+}
+
+.board-link:focus {
+  border-color: var(--accent);
+  background: #fff;
+  color: var(--text);
+}
+
 .toolbar-hint {
   font-size: 12px;
   color: var(--muted);

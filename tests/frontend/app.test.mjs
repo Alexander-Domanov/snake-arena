@@ -75,8 +75,8 @@ function createMockApi() {
   return { boards, calls, fetch };
 }
 
-function setupApp(fetchImpl) {
-  const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'http://localhost/' });
+function setupApp(fetchImpl, url = 'http://localhost/') {
+  const dom = new JSDOM(html, { runScripts: 'outside-only', url });
   dom.window.fetch = fetchImpl;
   dom.window.eval(appJs); // run the IIFE inside the jsdom window
   return dom;
@@ -124,6 +124,95 @@ test('on load: creates a board (POST /boards, no body) and renders the empty boa
 
   assert.equal(doc.querySelectorAll('.el').length, 0);
   assert.notEqual(doc.getElementById('empty-hint').style.display, 'none', 'empty hint should be visible');
+});
+
+// ---------- joining a board by link (?board=<id>) ----------
+
+const EXISTING_ID = '11111111-1111-4111-8111-111111111111';
+const MISSING_ID = '22222222-2222-4222-8222-222222222222';
+
+function seedBoard(api, id = EXISTING_ID) {
+  api.boards.set(id, {
+    id,
+    name: null,
+    created_at: '2026-08-31T19:00:00Z',
+    elements: [
+      {
+        id: 'el-pre',
+        board_id: id,
+        type: 'sticky_note',
+        x: 10,
+        y: 20,
+        width: 160,
+        height: 160,
+        text: 'Joined!',
+        created_at: '2026-08-31T19:00:01Z',
+      },
+    ],
+  });
+}
+
+test('open ?board=<id>: joins the existing board, does NOT create a new one, shows the share link', async () => {
+  const api = createMockApi();
+  seedBoard(api);
+  const dom = setupApp(api.fetch, `http://localhost/?board=${EXISTING_ID}`);
+  const doc = dom.window.document;
+
+  await waitFor(() => doc.querySelectorAll('.el').length === 1);
+
+  assert.equal(doc.getElementById('board').dataset.boardId, EXISTING_ID);
+  assert.equal(
+    api.calls.filter((c) => c.method === 'POST' && c.path === '/boards').length,
+    0,
+    'no new board should be created when joining by link'
+  );
+  assert.ok(
+    api.calls.some((c) => c.method === 'GET' && c.path === `/boards/${EXISTING_ID}`),
+    'GET /boards/{id} should be called'
+  );
+
+  const note = doc.querySelector('.el .note-body');
+  assert.ok(note, 'sticky note from the joined board should be rendered');
+  assert.equal(note.textContent, 'Joined!');
+
+  const link = doc.getElementById('board-link');
+  assert.ok(link.value.includes(`?board=${EXISTING_ID}`), 'share link should contain the board id');
+  assert.equal(doc.getElementById('btn-copy-link').disabled, false, 'copy button should be enabled');
+});
+
+test('open ?board=<unknown>: shows an error, clears the bad id and creates a new board', async () => {
+  const api = createMockApi();
+  const dom = setupApp(api.fetch, `http://localhost/?board=${MISSING_ID}`);
+  const doc = dom.window.document;
+
+  await waitFor(() => doc.getElementById('error-banner').classList.contains('visible'));
+  assert.match(doc.getElementById('error-banner').textContent, new RegExp(MISSING_ID));
+  assert.match(doc.getElementById('error-banner').textContent, /не найдена/);
+
+  // fallback: a fresh board is created and the URL now points to it
+  await waitFor(() => doc.getElementById('board').dataset.boardId);
+  const newId = doc.getElementById('board').dataset.boardId;
+  assert.notEqual(newId, MISSING_ID, 'the bad id must not be reused');
+  assert.equal(
+    api.calls.filter((c) => c.method === 'POST' && c.path === '/boards').length,
+    1,
+    'exactly one new board should be created'
+  );
+  assert.ok(dom.window.location.search.includes('board='), 'URL should point to the new board');
+  assert.ok(!dom.window.location.search.includes(MISSING_ID), 'bad id should be gone from the URL');
+});
+
+test('after creating a board: the URL and the share link contain ?board=<id>', async () => {
+  const api = createMockApi();
+  const dom = setupApp(api.fetch);
+  const doc = dom.window.document;
+
+  await waitFor(() => doc.getElementById('board').dataset.boardId);
+  const bid = doc.getElementById('board').dataset.boardId;
+
+  assert.equal(dom.window.location.search, `?board=${bid}`, 'URL should be updated to the board link');
+  assert.equal(doc.getElementById('board-link').value, `http://localhost/?board=${bid}`);
+  assert.equal(doc.getElementById('btn-copy-link').disabled, false);
 });
 
 // ---------- adding elements ----------
