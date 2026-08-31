@@ -7,6 +7,7 @@
 - `uv run pytest` – run all tests
 - `uv run pytest tests/test_api.py` – run specific test file
 - `uv run pytest -k delete` – run tests matching a keyword
+- `npm test` – run frontend tests (jsdom + node:test; `npm install` once)
 - `uv run python -m openapi_generator` – generate client (if needed)
 
 ## Rules

@@ -54,13 +54,18 @@ after every mutation.
 
 ## Tests
 
+Backend (unit + API integration):
+
 ```bash
 uv run pytest
 ```
 
-Runs 30 tests: unit tests for SQLAlchemy models and pydantic schemas
-(`tests/test_models.py`) and integration tests for all API endpoints
-(`tests/test_api.py`, isolated in-memory database).
+Frontend (contract behavior of `app.js` in jsdom; requires Node.js 18+):
+
+```bash
+npm install   # once
+npm test
+```
 
 ## Configuration
 

@@ -10,3 +10,6 @@ db.sqlite3
 # IDE / OS
 .idea/
 .DS_Store
+
+# Node (frontend tests)
+node_modules/

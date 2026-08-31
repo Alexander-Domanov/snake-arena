@@ -1,0 +1,13 @@
+{
+  "name": "interview-canvas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Frontend tests for Interview Canvas (jsdom + node:test)",
+  "scripts": {
+    "test": "node --test \"tests/frontend/*.test.mjs\""
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}
