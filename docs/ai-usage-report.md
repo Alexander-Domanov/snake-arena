@@ -17,9 +17,12 @@ which decisions and issues came up, and what share of the work the AI performed.
 | Frontend prototype | Wrote all the code, verified in a real browser | `frontend/` — index.html, style.css, app.js (Miro-like UI, drag-and-drop, sticky note editing) |
 | OpenAPI spec | Designed schemas, wrote and validated the spec | `openapi.yaml` — 4 endpoints, reusable components, examples |
 | Backend | Designed structure, implemented, ran the server | `backend/` — FastAPI, SQLAlchemy, SQLite |
-| Tests | Wrote unit and integration tests | `tests/` — 30 tests, all passing |
+| Tests | Wrote unit and integration tests | `tests/` — 32 tests, all passing |
+| Frontend tests | Wrote jsdom + node:test coverage of the API contract | `tests/frontend/app.test.mjs` — 10 tests, all passing |
 | Integration | Rewrote the frontend to use the real API, CORS, debugging | Frontend ↔ backend over REST, error handling |
-| Git | Committed after every stage | 6 commits, clean history |
+| Join-by-link | Implemented joining a board by URL and the share link UI | Frontend opens `?board=<id>` instead of always creating a new board |
+| Docs/packaging | README, MIT license, workflow section | `README.md`, `LICENSE` |
+| Git | Committed after every stage | 13 commits, clean history |
 
 ### Stage details
 
@@ -54,6 +57,21 @@ which decisions and issues came up, and what share of the work the AI performed.
 
 7. **Git** — the AI committed after each meaningful step (per the AGENTS.md rule).
 
+8. **Frontend tests** — the real `frontend/index.html` + `app.js` are loaded into
+   jsdom with a mocked `fetch` (an in-memory fake mirroring openapi.yaml), and the
+   contract behavior is verified: create a board on load, add/delete elements with
+   the correct payloads, reload after mutations, error handling.
+
+9. **Join-by-link** — the frontend reads `?board=<id>` from the URL on load: if
+   present, it calls `GET /boards/{id}` instead of creating a new board; after
+   creation the URL is updated to the shareable link (`history.replaceState`), the
+   toolbar shows the link plus a "Copy link" button; a 404 on join shows an error
+   and falls back to creating a new board. Verified in a real browser (create flow
+   and join flow against the running backend).
+
+10. **Docs/packaging** — README with a workflow section and badges, MIT license,
+    `DATABASE_URL` made configurable.
+
 ---
 
 ## 2. Key prompts
@@ -72,6 +90,11 @@ Shown briefly (user's wording):
 4. "Update the frontend to use the real backend instead of mocks… create a board
    on load, POST/DELETE, error handling (alert/message, 404 to console),
    base URL localhost:8000, add CORS, verify in the browser, commit."
+5. "я вот запустил и не могу понять про доску и получение доски" / "а как должно
+   быть по ТЗ?" — explaining the board lifecycle and the gap between user story #2
+   (join by ID) and its acceptance criteria.
+6. "да давай приведем" — implement join-by-link per the spec, add frontend tests,
+   update the acceptance criteria checkboxes in product-spec.md.
 
 All prompts were in Russian, with clear requirements and acceptance criteria.
 
@@ -87,9 +110,12 @@ All prompts were in Russian, with clear requirements and acceptance criteria.
 | 4 | New elements stacked exactly on top of each other | Integration, E2E check | Cascade counter reset after every board reload | Offset from center computed from `elements.length` (deterministic) |
 | 5 | CORS blocked requests from a file:// page | Integration | No middleware on the backend | CORSMiddleware allow_origins=["*"] + preflight OPTIONS verified |
 | 6 | (Proactively) DetachedInstanceError during serialization | Backend | Lazy relationship loading after session close | `selectinload` in get_board |
+| 7 | Join link "didn't work" — `?board=<id>` opened an empty board | Live check after join-by-link | The browser served a cached old `app.js` (python http.server sends no Cache-Control; Chrome heuristic caching) — the old code always creates a new board and ignores the URL | Hard refresh / incognito; server logs showed GET /boards/{id} → 200 — the new code was already working |
 
 Plus minor non-bug decisions: system Python 3.9 was too old → uv downloaded a
-managed Python 3.11 itself; sqlite was not added to dependencies (stdlib module).
+managed Python 3.11 itself; sqlite was not added to dependencies (stdlib module);
+"Address already in use" when starting uvicorn — a leftover dev server was already
+on port 8000, not a code issue.
 
 ---
 
@@ -114,7 +140,12 @@ managed Python 3.11 itself; sqlite was not added to dependencies (stdlib module)
    text edits live only in the DOM because the API has no update endpoint. This is
    stated explicitly — the next step (PATCH) is obvious.
 7. **Committing after every stage** gives a clean history and rollback points:
-   6 commits, each self-contained.
+   13 commits, each self-contained.
+8. **Static dev servers + browser cache can fake a broken frontend.** python
+   http.server sends no Cache-Control, so Chrome heuristically caches app.js; after
+   an edit, an old tab keeps running the stale code. Before concluding the code is
+   broken, verify the served file (hard refresh, incognito, or check the actual
+   HTTP responses).
 
 ---
 
@@ -128,6 +159,9 @@ managed Python 3.11 itself; sqlite was not added to dependencies (stdlib module)
 | Backend | 90% | 10% | File structure from the spec, implementation — AI |
 | Tests | 95% | 5% | Written and run by AI |
 | Integration | 85% | 15% | Detailed requirements + CORS instruction — human, debugging — AI |
+| Frontend tests | 95% | 5% | Written and run by AI |
+| Join-by-link | 90% | 10% | Requirement (join per the spec) — human, implementation — AI |
+| Docs/packaging | 80% | 20% | Content generated by AI, reviewed by human |
 | **Total** | **≈ 85%** | **≈ 15%** | Rough estimate by volume and significance of contribution |
 
 The estimate is rough. The human owned the direction (what to build, requirements,
@@ -141,9 +175,8 @@ requirements and the existing spec, the AI share would have been lower.
 **Actual time (measured from file and git commit timestamps):**
 
 - First project file: `product-spec.md` — created 2026-08-31 18:36:37
-- Last change: `docs/ai-usage-report.md` — created 2026-08-31 19:03:27;
-  last commit `3603df4` — 2026-08-31 19:03:30
-- **Total from the first file to the last commit: ≈ 27 minutes**
+- Last change: commit `740414d` (join-by-link) — 2026-08-31 19:43:40
+- **Total from the first file to the last commit: ≈ 67 minutes**
 
 Stages by commit timestamps:
 
@@ -153,7 +186,12 @@ Stages by commit timestamps:
 | 8e47d10 | 18:50:35 | Backend (FastAPI + SQLite) |
 | 404d07b | 18:56:15 | Tests + AGENTS.md |
 | f4a4453, f03f29b | 19:02:04 | Frontend–API integration (CORS, POST/DELETE) |
-| 3603df4 | 19:03:30 | AI usage report |
+| 3603df4 | 19:03:30 | AI usage report (first version) |
+| b84942e, f025bd1 | 19:06–19:07 | AI usage report (time measured, English) |
+| e4f7ac7 | 19:10:28 | README + DATABASE_URL |
+| 871c2ab | 19:15:24 | Frontend tests (jsdom + node:test) |
+| 3e8a735, e241704 | 19:25:26 | MIT license + README workflow/badges |
+| 740414d | 19:43:40 | Join-by-link (?board=<id>) + share link |
 
 Note on the discrepancy with the earlier estimate: the first version of this
 report used a rough "2.5–3 hours" figure — based on the volume of work. Actual
