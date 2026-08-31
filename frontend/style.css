@@ -277,3 +277,29 @@ body {
   color: #b3b3b3;
   font-size: 13px;
 }
+
+/* ---------- Error banner ---------- */
+
+.error-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translate(-50%, -8px);
+  max-width: 80%;
+  padding: 10px 16px;
+  background: #d92d20;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 1000;
+}
+
+.error-banner.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
