@@ -2,14 +2,21 @@
 
 Run from the repo root:
     uv run uvicorn backend.main:app --reload
+
+The app serves both the API and the static frontend (single origin),
+so the same container/image works in dev and production.
 """
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .database import Base, engine
 from .routes import router
+
+FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
 
 
 @asynccontextmanager
@@ -35,3 +42,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+
+# Serve the static frontend from the same origin (production pattern).
+# Mounted last so API routes (/boards, /elements, /healthz) take precedence.
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
