@@ -1,0 +1,21 @@
+# Build context: keep the image small and avoid leaking local state
+.venv/
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+db.sqlite3
+*.db
+
+.git/
+.gitignore
+.idea/
+.DS_Store
+.hermes/
+
+tests/
+e2e/
+docs/
+README.md
+LICENSE
