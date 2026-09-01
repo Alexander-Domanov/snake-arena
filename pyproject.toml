@@ -14,6 +14,9 @@ dependencies = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "integration: tests that run against a real Postgres database (start it with: docker compose up -d)",
+]
 
 [dependency-groups]
 dev = [
