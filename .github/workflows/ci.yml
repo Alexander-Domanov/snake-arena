@@ -1,0 +1,122 @@
+# CI — runs on every pull request:
+#   - backend unit tests (in-memory SQLite, no services needed)
+#   - frontend tests (jsdom + node:test)
+#   - integration tests against real Postgres (GitHub Actions service)
+#   - e2e tests against the docker-compose stack (real container + Postgres)
+#   - Docker image build + compose config validation
+#
+# Isolation notes:
+#   - unit tests use in-memory SQLite (self-contained)
+#   - integration tests use a dedicated database (canvas_test), created and
+#     dropped by the test session; the dev database is never touched
+#   - e2e runs the full compose stack and tears it down with -v (fresh volume)
+#   - no secrets are needed for CI (deploy credentials come in Phase 6 via OIDC)
+
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-unit:
+    name: Backend unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Run unit tests
+        run: uv run pytest -m "not integration" -q
+
+  frontend:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run frontend tests
+        run: npm test
+
+  integration:
+    name: Integration tests (Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: canvas
+          POSTGRES_PASSWORD: canvas
+          POSTGRES_DB: canvas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U canvas -d canvas"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Run integration tests against real Postgres
+        run: uv run pytest tests/integration -m integration -q
+        env:
+          TEST_DATABASE_ADMIN_URL: postgresql+psycopg://canvas:canvas@localhost:5432/canvas
+          TEST_DATABASE_URL: postgresql+psycopg://canvas:canvas@localhost:5432/canvas_test
+
+  e2e:
+    name: E2E tests (docker compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the compose stack
+        run: docker compose up -d --build
+      - name: Wait for the app healthcheck
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8100/healthz >/dev/null 2>&1; then
+              echo "app is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "app did not become healthy" >&2
+          docker compose logs app
+          exit 1
+      - uses: astral-sh/setup-uv@v5
+      - name: Install test dependencies
+        run: uv sync --frozen
+      - name: Install Playwright browser
+        run: uv run playwright install --with-deps chromium
+      - name: Run E2E tests
+        run: uv run pytest e2e -q
+      - name: Tear down the stack (fresh volume next time)
+        if: always()
+        run: docker compose down -v
+
+  build:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Docker image
+        run: docker build -t interview-canvas:ci .
+      - name: Validate compose config
+        run: docker compose config -q
