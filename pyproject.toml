@@ -16,10 +16,12 @@ pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
     "integration: tests that run against a real Postgres database (start it with: docker compose up -d)",
+    "e2e: Playwright end-to-end tests against the docker-compose stack (start it with: docker compose up -d; run with: uv run pytest e2e -v)",
 ]
 
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
     "pytest>=9.1.1",
+    "pytest-playwright>=0.9.0",
 ]
