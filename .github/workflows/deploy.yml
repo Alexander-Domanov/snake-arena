@@ -1,0 +1,83 @@
+# Deploy — Render (deploy hooks) with staging -> production promotion.
+#
+# Flow:
+#   push to main        -> deploy staging (hook) -> smoke /healthz -> deploy production -> smoke /healthz
+#   workflow_dispatch   -> deploy the chosen environment (staging or production); use this
+#                          to re-run a deploy. Rollback is done in the Render dashboard
+#                          (Service -> Deploy -> previous successful deploy).
+#
+# Required GitHub secrets:
+#   RENDER_STAGING_HOOK_URL     - Render deploy hook for the staging environment/service
+#   RENDER_PRODUCTION_HOOK_URL  - Render deploy hook for the production environment/service
+#   STAGING_URL                 - public staging URL, e.g. https://your-app-staging.onrender.com
+#   PRODUCTION_URL              - public production URL, e.g. https://your-app.onrender.com
+#
+# Render builds the image from the repo (Dockerfile) and runs migrations via the
+# entrypoint (alembic upgrade head), so no deploy-time migration step is needed here.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which environment to deploy
+        required: true
+        default: production
+        type: choice
+        options: [staging, production]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Trigger Render deploy (staging)
+        run: curl -fsS -X POST "${{ secrets.RENDER_STAGING_HOOK_URL }}"
+      - name: Wait for staging health
+        run: |
+          url="${{ secrets.STAGING_URL }}"
+          for i in $(seq 1 60); do
+            if curl -fsS --max-time 10 "$url/healthz" 2>/dev/null | grep -q '"ok"'; then
+              echo "staging is healthy"
+              exit 0
+            fi
+            echo "waiting for staging... ($i/60)"
+            sleep 5
+          done
+          echo "staging did not become healthy" >&2
+          exit 1
+
+  deploy-production:
+    needs: deploy-staging
+    if: always() && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard — do not promote when staging failed
+        if: github.event_name == 'push' && needs.deploy-staging.result != 'success'
+        run: |
+          echo "staging did not pass; not deploying to production" >&2
+          exit 1
+      - name: Trigger Render deploy (production)
+        run: curl -fsS -X POST "${{ secrets.RENDER_PRODUCTION_HOOK_URL }}"
+      - name: Wait for production health
+        run: |
+          url="${{ secrets.PRODUCTION_URL }}"
+          for i in $(seq 1 60); do
+            if curl -fsS --max-time 10 "$url/healthz" 2>/dev/null | grep -q '"ok"'; then
+              echo "production is healthy"
+              exit 0
+            fi
+            echo "waiting for production... ($i/60)"
+            sleep 5
+          done
+          echo "production did not become healthy" >&2
+          exit 1

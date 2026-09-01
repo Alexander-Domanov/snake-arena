@@ -1,0 +1,25 @@
+# Render Blueprint — connect this repo to Render and it provisions:
+#   - web service built from the Dockerfile (port 8000, /healthz)
+#   - managed Postgres
+# DATABASE_URL is injected from the Postgres instance (plain postgresql:// URL;
+# the app normalizes it to the psycopg driver at startup).
+#
+# For staging, add a second environment to the service in the Render dashboard
+# (Service -> Environments) and grab its deploy hook for RENDER_STAGING_HOOK_URL.
+
+services:
+  - type: web
+    name: interview-canvas
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: interview-canvas-db
+          property: connectionString
+
+databases:
+  - name: interview-canvas-db
+    plan: free

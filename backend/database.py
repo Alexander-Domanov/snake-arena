@@ -15,7 +15,22 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DB_PATH = PROJECT_ROOT / "db.sqlite3"
 
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+_DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+
+
+def normalize_database_url(url: str) -> str:
+    """Map plain postgresql:// to the installed driver (psycopg v3).
+
+    Managed providers (Render, Railway, Fly) hand out postgresql:// URLs; the
+    SQLAlchemy default dialect for that scheme is psycopg2, which we do not
+    install. Explicitly route to postgresql+psycopg instead.
+    """
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return url
+
+
+DATABASE_URL = normalize_database_url(_DATABASE_URL)
 
 # FastAPI runs sync endpoints in a threadpool, so SQLite needs the shared
 # connection flag. Other drivers don't need (or accept) this argument.
