@@ -1,0 +1,38 @@
+# Run the full stack locally: docker compose up --build
+# App: http://localhost:8100   API docs: http://localhost:8100/docs
+#
+# Note: the DATABASE_URL scheme is postgresql+psycopg (psycopg v3 is the
+# installed driver; plain postgresql:// would look for psycopg2).
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-canvas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-canvas}
+      POSTGRES_DB: ${POSTGRES_DB:-canvas}
+    volumes:
+      - canvas-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-canvas} -d ${POSTGRES_DB:-canvas}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-canvas}:${POSTGRES_PASSWORD:-canvas}@db:5432/${POSTGRES_DB:-canvas}
+    ports:
+      - "8100:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  canvas-pgdata:
