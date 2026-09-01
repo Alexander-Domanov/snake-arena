@@ -217,3 +217,11 @@ def test_delete_element_twice_404(client):
 def test_delete_element_invalid_uuid_422(client):
     r = client.delete("/elements/not-a-uuid")
     assert r.status_code == 422
+
+
+# ---- GET /healthz ----
+
+def test_healthz_ok(client):
+    r = client.get("/healthz")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok", "database": "ok"}

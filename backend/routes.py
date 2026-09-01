@@ -57,3 +57,12 @@ def delete_element(
 ) -> Response:
     services.delete_element(db, str(element_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/healthz",
+    response_model=schemas.HealthOut,
+    summary="Health check",
+)
+def healthz(db: Session = Depends(get_db)) -> dict:
+    return services.health_check(db)

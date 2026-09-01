@@ -60,3 +60,10 @@ class BoardOut(BaseModel):
     @field_serializer("created_at")
     def _ser_created_at(self, dt: datetime) -> str:
         return to_utc_z(dt)
+
+
+class HealthOut(BaseModel):
+    """Matches the Health schema in openapi.yaml."""
+
+    status: str
+    database: str

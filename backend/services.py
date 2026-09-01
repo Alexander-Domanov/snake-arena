@@ -1,6 +1,7 @@
 """Business logic: all DB operations live here, routes stay thin."""
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
 from . import models, schemas
@@ -51,3 +52,15 @@ def delete_element(db: Session, element_id: str) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Element not found")
     db.delete(element)
     db.commit()
+
+
+def health_check(db: Session) -> dict:
+    """Service and database health. Raises 503 when the DB is unreachable."""
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        )
+    return {"status": "ok", "database": "ok"}

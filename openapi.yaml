@@ -23,6 +23,8 @@ tags:
     description: Board lifecycle and read access
   - name: elements
     description: Elements on a board (sticky notes and shapes)
+  - name: health
+    description: Service health checks
 
 paths:
   /boards:
@@ -199,6 +201,34 @@ paths:
           description: Element deleted (no content)
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /healthz:
+    get:
+      tags:
+        - health
+      summary: Health check
+      description: |
+        Returns service and database status. Used by container healthchecks
+        and by the post-deploy smoke test in CI/CD.
+      operationId: healthz
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: Database is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                db-down:
+                  summary: Database unreachable
+                  value:
+                    detail: Database unavailable
 
 components:
   parameters:
@@ -389,6 +419,20 @@ components:
         detail:
           type: string
           example: Board not found
+
+    Health:
+      type: object
+      description: Health check result.
+      required:
+        - status
+        - database
+      properties:
+        status:
+          type: string
+          example: ok
+        database:
+          type: string
+          example: ok
 
     ValidationError:
       type: object
