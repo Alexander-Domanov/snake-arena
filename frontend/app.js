@@ -1,7 +1,9 @@
 'use strict';
 
 (function () {
-  const API_BASE = 'http://localhost:8000';
+  // Относительные пути: в проде фронтенд и API живут на одном origin
+  // (FastAPI раздаёт статику). В dev — тоже: uvicorn на :8000 отдаёт и UI, и API.
+  const API_BASE = '';
 
   const board = document.getElementById('board');
   const emptyHint = document.getElementById('empty-hint');
