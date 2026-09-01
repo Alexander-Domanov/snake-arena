@@ -9,20 +9,24 @@ so the same container/image works in dev and production.
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .database import Base, engine
 from .routes import router
 
-FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FRONTEND_DIR = PROJECT_ROOT / "frontend"
+ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # MVP: create tables on startup (no migrations yet)
-    Base.metadata.create_all(bind=engine)
+    # Migrations run on startup (idempotent): a fresh DB gets the schema here,
+    # and production runs the same command as part of the deploy.
+    command.upgrade(Config(str(ALEMBIC_INI)), "head")
     yield
 
 
