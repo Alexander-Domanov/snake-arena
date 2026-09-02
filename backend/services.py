@@ -54,6 +54,25 @@ def delete_element(db: Session, element_id: str) -> None:
     db.commit()
 
 
+def update_element(
+    db: Session, element_id: str, payload: schemas.ElementUpdate
+) -> models.Element:
+    """Apply a partial update: only fields present in the payload change.
+
+    `exclude_unset` keeps an explicit `null` (e.g. `{"text": null}` clears the
+    text) distinct from an omitted field (left unchanged).
+    """
+    element = db.get(models.Element, element_id)
+    if element is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Element not found")
+    updates = payload.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(element, field, value)
+    db.commit()
+    db.refresh(element)
+    return element
+
+
 def health_check(db: Session) -> dict:
     """Service and database health. Raises 503 when the DB is unreachable."""
     try:

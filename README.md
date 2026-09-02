@@ -213,9 +213,14 @@ All steps were verified by running the app locally and passing the CI suites
 ## API contract
 
 `openapi.yaml` is the source of truth for the API. The backend implements it
-exactly; FastAPI's generated `/openapi.json` mirrors the same four endpoints:
+exactly; FastAPI's generated `/openapi.json` mirrors the same five endpoints:
 
 - `POST /boards` — create a board
 - `GET /boards/{board_id}` — get a board with all elements
 - `POST /boards/{board_id}/elements` — add an element (sticky_note / rectangle / circle)
+- `PATCH /elements/{element_id}` — partially update an element (x, y, text) — persists drag-and-drop position and sticky note text edits
 - `DELETE /elements/{element_id}` — delete an element
+
+Edits are saved when the user stops: sticky text on blur, position on
+pointerup after a drag (not on every keystroke/mousemove). The frontend keeps
+the change visible locally and shows a banner if saving fails.

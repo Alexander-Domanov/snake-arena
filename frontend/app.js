@@ -160,6 +160,24 @@
 
   // ---------- мутации (после каждой — перезагрузка доски с сервера) ----------
 
+  // PATCH /elements/{id}: partial update (x, y, text). Обновляет локальный
+  // кэш ответом сервера; при ошибке показывает баннер, но НЕ откатывает
+  // изменения — пользователь видит свой результат, а повторная попытка
+  // произойдёт при следующем действии или перезагрузке страницы.
+  async function updateElementOnServer(id, patch) {
+    try {
+      const updated = await api(`/elements/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const idx = elements.findIndex((x) => String(x.id) === String(id));
+      if (idx !== -1) elements[idx] = updated;
+    } catch (err) {
+      handleApiError(err, 'Сохранение изменений');
+    }
+  }
+
   async function addElementToServer(type) {
     if (!boardId) {
       showError('Доска ещё не создана. Проверь, что бэкенд запущен, и обнови страницу.');
@@ -221,9 +239,14 @@
       body.className = 'note-body';
       body.contentEditable = 'false';
       body.textContent = el.text || '';
-      body.addEventListener('dblclick', () => startEditing(el.id));
       body.addEventListener('blur', () => stopEditing(el.id, body));
       node.appendChild(body);
+      // dblclick вешаем на node, а не на .note-body: drag делает
+      // setPointerCapture, и dblclick приходит с target = .el.
+      node.addEventListener('dblclick', (e) => {
+        if (e.target.closest('.delete-btn')) return;
+        startEditing(el.id);
+      });
     }
 
     const del = document.createElement('button');
@@ -279,10 +302,18 @@
     body.contentEditable = 'false';
     body.classList.remove('editing');
     const el = elements.find((x) => String(x.id) === String(id));
-    if (el) el.text = body.textContent.trim();
+    if (!el) return;
+    const newText = body.textContent.trim();
+    const changed = newText !== (el.text || '');
+    el.text = newText; // локально — сразу, чтобы UI не «откатывался» при ошибке сети
+    // Персистим на сервер по blur (не по каждому символу). Если текст не
+    // менялся — запрос не шлём.
+    if (changed && boardId) {
+      updateElementOnServer(id, { text: newText });
+    }
   }
 
-  // ---------- drag (локально; сервер хранит позицию, заданную при создании) ----------
+  // ---------- drag (позиция персистится PATCH'ем по pointerup) ----------
 
   board.addEventListener('pointerdown', (e) => {
     if (e.target.closest('.delete-btn')) return;
@@ -317,7 +348,9 @@
     } catch (_) {
       /* синтетические события в тестах могут не иметь pointerId */
     }
-    e.preventDefault();
+    // НЕ вызываем e.preventDefault() здесь: canceling pointerdown подавляет
+    // генерацию click/dblclick, и двойной клик по стикеру не откроет редактор.
+    // Запрет выделения/скролла включается в pointermove при реальном сдвиге.
   });
 
   window.addEventListener('pointermove', (e) => {
@@ -325,6 +358,11 @@
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
     if (!drag.moved && Math.hypot(dx, dy) < 3) return;
+    if (!drag.moved) {
+      // Драг реально начался — теперь запрещаем выделение/скролл.
+      // (Раньше preventDefault был в pointerdown и ломал dblclick.)
+      e.preventDefault();
+    }
     drag.moved = true;
     const x = drag.origX + dx;
     const y = drag.origY + dy;
@@ -338,9 +376,18 @@
 
   window.addEventListener('pointerup', () => {
     if (!drag) return;
+    const { id, node, moved } = drag;
     drag.node.classList.remove('dragging');
     drag.node.style.zIndex = '';
     drag = null;
+    // Сохраняем позицию на сервер только по завершении движения (pointerup),
+    // а не на каждый mousemove. Если элемент не двигался — запрос не шлём.
+    if (moved && boardId) {
+      updateElementOnServer(id, {
+        x: parseFloat(node.style.left),
+        y: parseFloat(node.style.top),
+      });
+    }
   });
 
   // ---------- delete button ----------

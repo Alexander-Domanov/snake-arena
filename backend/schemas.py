@@ -31,6 +31,18 @@ class ElementCreate(BaseModel):
     text: str | None = Field(default=None, max_length=500)
 
 
+class ElementUpdate(BaseModel):
+    """Partial update — only fields present in the request are applied.
+
+    `model_dump(exclude_unset=True)` in the service distinguishes an omitted
+    field from an explicit `null` (used to clear `text`).
+    """
+
+    x: float | None = None
+    y: float | None = None
+    text: str | None = Field(default=None, max_length=500)
+
+
 class ElementOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
