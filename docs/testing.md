@@ -1,6 +1,6 @@
 # Testing Strategy
 
-Interview Canvas is tested at four layers. Each layer answers a different
+Interview Canvas is tested at several layers. Each layer answers a different
 question and runs in a different environment; together they make sure that a
 green pipeline means the app actually works, not just that it imports.
 
@@ -8,10 +8,10 @@ green pipeline means the app actually works, not just that it imports.
 |-------|------------------|-------------|------------|
 | Lint | ruff (E/F/W/I/UP/B rules) over backend, tests, e2e, alembic | uv | `lint` job |
 | Backend unit tests | models, pydantic schemas, DB helpers | in-memory SQLite | `backend-unit` job |
-| API integration tests | the 4 endpoints over the real FastAPI app | in-memory SQLite (dependency override) | `backend-unit` job |
-| Frontend tests | contract behavior of `app.js` (payloads, reloads, error handling) | jsdom + node:test | `frontend` job |
-| Integration tests (Postgres) | real database: migrations, CRUD, `/healthz` | real Postgres 16 | `integration` job |
-| E2E tests | two-session board flow through the real container | docker-compose stack + Playwright (Chromium) | `e2e` job |
+| API integration tests | the 5 endpoints over the real FastAPI app | in-memory SQLite (dependency override) | `backend-unit` job |
+| Frontend tests | contract behavior of `app.js` (payloads, reloads, PATCH persistence, error handling) | jsdom + node:test | `frontend` job |
+| Integration tests (Postgres) | real database: migrations, CRUD + PATCH updates, `/healthz` | real Postgres 16 | `integration` job |
+| E2E tests | two-session board flow: shared edits persist across reloads | docker-compose stack + Playwright (Chromium) | `e2e` job |
 | Image build | the Dockerfile builds and compose config is valid | Docker | `build` job |
 
 ## Running locally
@@ -40,18 +40,21 @@ npm test
 - `tests/test_database.py` — `DATABASE_URL` handling and SQLite session setup.
 - `tests/test_api.py` — API contract: 201/204/200/404/422, enum validation
   (`sticky_note` vs `sticky`), UUID validation, cascade delete, date format,
-  board lifecycle (create → get → add elements → delete).
+  board lifecycle (create → get → add → PATCH update → delete).
 - `tests/frontend/app.test.mjs` — the real `frontend/index.html` + `app.js`
   loaded into jsdom with a mocked `fetch` (an in-memory fake mirroring
   `openapi.yaml`): create a board on load, add/delete elements with correct
-  payloads, reload after mutations, `?board=<id>` join flow, error handling.
+  payloads, reload after mutations, `?board=<id>` join flow, PATCH persistence
+  (text on blur, position on pointerup, no-PATCH guards), error handling.
 - `tests/integration/` — real Postgres: Alembic migrations apply cleanly
-  (`test_migrations.py`), CRUD persists and survives reconnects
-  (`test_crud_postgres.py`), `/healthz` reports database health
+  (`test_migrations.py`), CRUD + PATCH updates persist and survive reconnects
+  (`test_crud_postgres.py`: text-only, position-only, both fields, clear-null,
+  empty-body no-op, 404), `/healthz` reports database health
   (`test_healthz.py`).
 - `e2e/test_two_sessions.py` — Playwright scenario: two browser sessions on the
-  same board; an element added by the candidate becomes visible to the
-  interviewer after reload (server as source of truth).
+  same board; the candidate adds a sticky note, edits its text and drags it,
+  and the interviewer sees the persisted text AND position after a reload
+  (server as source of truth), then a delete propagates the same way.
 
 ## Isolation rules
 

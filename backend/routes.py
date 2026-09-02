@@ -1,4 +1,4 @@
-"""API routes — exactly the four endpoints from openapi.yaml."""
+"""API routes — exactly the five endpoints from openapi.yaml."""
 import uuid
 
 from fastapi import APIRouter, Depends, Response, status

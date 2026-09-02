@@ -139,6 +139,8 @@ on port 8000, not a code issue.
 6. **Document API limitations instead of masking them.** Dragging and sticky note
    text edits live only in the DOM because the API has no update endpoint. This is
    stated explicitly — the next step (PATCH) is obvious.
+   *(Implemented later as `PATCH /elements/{element_id}` — persistent editing;
+   see the Module 3 addendum, section 8.4.)*
 7. **Committing after every stage** gives a clean history and rollback points:
    13 commits, each self-contained.
 8. **Static dev servers + browser cache can fake a broken frontend.** python
@@ -261,6 +263,29 @@ The Module 3 estimate mirrors the earlier modules: the human decided *what*
 (test on the real stack, deploy to Render, staging → production) and supplied
 account-level access; the AI implemented, ran the pipelines, and debugged
 failures found by real runs.
+
+### 8.4 Persistent editing (PATCH), 2026-09-02
+
+Follow-up feature after the Module 3 deploy: sticky note text edits (on blur)
+and drag positions (on pointerup) are persisted via a new `PATCH
+/elements/{element_id}` endpoint instead of living only in the DOM.
+
+| Item | What happened |
+|------|---------------|
+| Contract | `openapi.yaml` first: PATCH path + `ElementUpdate` (optional x/y/text) + examples |
+| Backend | `schemas.ElementUpdate`, `services.update_element` (partial via `exclude_unset`; explicit `null` clears text), `routes.patch_element` |
+| Frontend | `updateElementOnServer()` on blur and pointerup (not per keystroke/mousemove); local state kept on error, banner/log on failure, no rollback |
+| Tests | 6 integration tests on real Postgres, 5 new jsdom tests, E2E extended to edit text + drag and verify persistence after reload |
+| **Bug found by E2E** | Real double-click editing was broken: `preventDefault()` on pointerdown suppressed click/dblclick generation, and after `setPointerCapture` the dblclick targets the `.el` node while the listener sat on `.note-body`. jsdom tests masked it (synthetic events); only the real-browser Playwright test caught it. Fix: preventDefault only on real drag start; dblclick listener moved to the element node. |
+
+Deploy note: after the merge, Render kept serving the old code because the
+service was attached to branch `module3` (stale), not `main`. The Deploy
+workflow reported success anyway — a deploy hook returns 200 immediately and
+the `/healthz` smoke test passes against the still-running old instance.
+Lesson: a green deploy workflow does not prove new code is live; verify the
+deployed artifact (e.g. `/openapi.json`), and keep the platform branch in
+sync with the release branch. Fix: fast-forwarded `module3` to `main` and
+re-ran the deploy.
 
 ---
 
