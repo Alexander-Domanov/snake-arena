@@ -1,6 +1,6 @@
 """SQLAlchemy ORM models. Shapes match the schemas in openapi.yaml (uuid strings, UTC datetimes)."""
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -13,7 +13,7 @@ def new_uuid() -> str:
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Board(Base):

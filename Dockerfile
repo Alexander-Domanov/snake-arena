@@ -1,16 +1,20 @@
 # Syntax: docker build -t interview-canvas:latest .
 #
-# Single container for the whole app (no Node stage — the frontend is vanilla
-# HTML/CSS/JS with no build step; FastAPI serves the static files).
+# Multi-stage build:
+#   stage "uv"    — pinned tool image that only provides the uv binary
+#   stage runtime — python:3.11-slim + app code (no build tools, no Node —
+#                   the frontend is vanilla HTML/CSS/JS and FastAPI serves it)
 # Dependencies are installed with uv from the lockfile for reproducibility.
+
+FROM ghcr.io/astral-sh/uv:latest AS uv
 
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# uv — fast, lockfile-driven dependency installer
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# uv — fast, lockfile-driven dependency installer (copied from the uv stage)
+COPY --from=uv /uv /usr/local/bin/uv
 
 WORKDIR /app
 

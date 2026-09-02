@@ -5,10 +5,10 @@ Uses the same DATABASE_URL default as the app (backend/database.py), so
 """
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 import backend.models  # noqa: F401  (registers tables on Base.metadata)
+from alembic import context
 from backend.database import DATABASE_URL, Base
 
 config = context.config
