@@ -23,6 +23,22 @@ FRONTEND_DIR = PROJECT_ROOT / "frontend"
 ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 
 
+class NoCacheStaticFiles(StaticFiles):
+    """StaticFiles that forces revalidation of every asset.
+
+    Without Cache-Control browsers heuristically cache app.js/style.css (they
+    have no versioned names in this project), so after a deploy users keep
+    running the stale JS from before the fix. `no-cache` still allows caching
+    but requires a revalidation round-trip: unchanged files come back as a
+    cheap 304, changed files are served fresh.
+    """
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Migrations run on startup (idempotent): a fresh DB gets the schema here,
@@ -50,4 +66,4 @@ app.include_router(router)
 
 # Serve the static frontend from the same origin (production pattern).
 # Mounted last so API routes (/boards, /elements, /healthz) take precedence.
-app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+app.mount("/", NoCacheStaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
