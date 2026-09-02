@@ -20,9 +20,9 @@ GitHub (source of truth)
 
 - **Infrastructure as code**: `render.yaml` (Render Blueprint) provisions the
   web service and the managed Postgres instance.
-- **Container**: single multi-stage image from `Dockerfile` — Python 3.11,
-  dependencies installed with `uv` from the lockfile. The frontend is static
-  files served by FastAPI, so no Node stage is needed.
+- **Container**: one multi-stage image from `Dockerfile` (uv stage + runtime
+  stage) — Python 3.11, dependencies installed with `uv` from the lockfile.
+  The frontend is static files served by FastAPI, so no Node stage is needed.
 - **Migrations**: `docker-entrypoint.sh` runs `alembic upgrade head` before
   the server starts, so every deploy migrates the database automatically.
 - **Database**: managed Postgres on Render. Render injects `DATABASE_URL` as a

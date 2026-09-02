@@ -215,15 +215,17 @@ writing `product-spec.md`, formulating tasks — is not captured by timestamps.
 | Containerization | Multi-stage Dockerfile (uv, no Node stage) + docker-compose (Postgres + app, healthchecks) | `Dockerfile`, `docker-compose.yml` |
 | Integration tests | Real Postgres: migrations apply, CRUD persists, healthz reflects DB | `tests/integration/` |
 | E2E tests | Playwright two-session board flow against the compose stack | `e2e/test_two_sessions.py` |
-| CI | GitHub Actions on every PR: unit, frontend, integration, e2e, image build | `.github/workflows/ci.yml` |
+| CI | GitHub Actions on every PR: lint (ruff), unit, frontend, integration, e2e, image build | `.github/workflows/ci.yml` |
 | Deploy | Render blueprint + deploy workflow staging → production via deploy hooks, smoke /healthz | `render.yaml`, `.github/workflows/deploy.yml` |
 | Secrets/docs | GitHub secrets, README + docs/testing.md, deployment.md, release-process.md | docs/ |
 
 ### 8.2 Module 3 decisions and issues
 
-- **Single container, no Node stage.** The frontend is vanilla HTML/CSS/JS with
-  no build step, so FastAPI serves the static files. This keeps the image
-  small and removes a whole class of build flakiness.
+- **Multi-stage container, no Node stage.** The frontend is vanilla HTML/CSS/JS
+  with no build step, so FastAPI serves the static files. This keeps the image
+  small and removes a whole class of build flakiness. The Dockerfile became a
+  real two-stage build (uv binary stage + runtime) to match the Module 3
+  requirement literally.
 - **Migrations run in the container entrypoint** (`alembic upgrade head`), so
   every deploy migrates automatically — no separate deploy-time step.
 - **DATABASE_URL normalization.** Render injects a plain `postgresql://` URL,
@@ -237,6 +239,13 @@ writing `product-spec.md`, formulating tasks — is not captured by timestamps.
 - **Bug fixed during CI bring-up:** the frontend job on Node 20 globbed the
   wrong test path and alembic needed the DB URL injected into the container —
   both surfaced by actually running CI, not by reading config.
+- **Bug found in a post-hoc audit (false-green CI):** the collection hook in
+  `tests/integration/conftest.py` skipped *every* collected test when Postgres
+  was unreachable — including unit tests that need no Postgres. The CI "Backend
+  unit tests" job (which runs without Postgres) therefore silently skipped all
+  34 unit tests and still reported green. Lesson: a green CI is only as good
+  as what actually ran; audit job logs for "skipped", not just for failures.
+  Fix: the hook now skips only tests carrying the `integration` marker.
 - **Verified end-to-end:** after wiring secrets, a push to `main` ran the whole
   workflow — staging deploy hook → healthy → production deploy hook → healthy
   (both `/healthz` returned ok).
