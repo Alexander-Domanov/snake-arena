@@ -1,8 +1,8 @@
 # AI Usage Report — Interview Canvas
 
-Date: 2026-08-31
+Date: 2026-08-31 (Modules 1–2); updated 2026-09-02 (Module 3)
 Project: Interview Canvas — collaborative whiteboard for system design interviews
-Stack: HTML/CSS/JS (frontend), FastAPI + SQLAlchemy + SQLite (backend), OpenAPI 3.0, pytest, uv
+Stack: HTML/CSS/JS (frontend), FastAPI + SQLAlchemy (backend), OpenAPI 3.0, pytest, uv, Docker, GitHub Actions, Render
 
 This report describes how the AI assistant was used at each stage of the project,
 which decisions and issues came up, and what share of the work the AI performed.
@@ -202,7 +202,60 @@ writing `product-spec.md`, formulating tasks — is not captured by timestamps.
 
 ---
 
-## 7. Manual edits
+## 8. Module 3 — test, containerize, deploy (addendum, 2026-09-01)
+
+### 8.1 How AI was used
+
+| Stage | AI role | Result |
+|-------|---------|--------|
+| Same-origin frontend | Rewrote API paths from absolute localhost to relative (single-origin deploy) | `frontend/app.js` |
+| Static serving | Served `frontend/` from FastAPI (no Node build, one container) | `backend/main.py` |
+| Health endpoint | Added `/healthz` contract-first (openapi.yaml → backend → tests) | `backend/routes.py`, tests |
+| Migrations | Added Alembic initial migration, runs on startup/entrypoint | `alembic/`, `docker-entrypoint.sh` |
+| Containerization | Multi-stage Dockerfile (uv, no Node stage) + docker-compose (Postgres + app, healthchecks) | `Dockerfile`, `docker-compose.yml` |
+| Integration tests | Real Postgres: migrations apply, CRUD persists, healthz reflects DB | `tests/integration/` |
+| E2E tests | Playwright two-session board flow against the compose stack | `e2e/test_two_sessions.py` |
+| CI | GitHub Actions on every PR: unit, frontend, integration, e2e, image build | `.github/workflows/ci.yml` |
+| Deploy | Render blueprint + deploy workflow staging → production via deploy hooks, smoke /healthz | `render.yaml`, `.github/workflows/deploy.yml` |
+| Secrets/docs | GitHub secrets, README + docs/testing.md, deployment.md, release-process.md | docs/ |
+
+### 8.2 Module 3 decisions and issues
+
+- **Single container, no Node stage.** The frontend is vanilla HTML/CSS/JS with
+  no build step, so FastAPI serves the static files. This keeps the image
+  small and removes a whole class of build flakiness.
+- **Migrations run in the container entrypoint** (`alembic upgrade head`), so
+  every deploy migrates automatically — no separate deploy-time step.
+- **DATABASE_URL normalization.** Render injects a plain `postgresql://` URL,
+  but the installed driver is psycopg v3 (`postgresql+psycopg://`). The app
+  normalizes the scheme at startup instead of forcing Render-side config.
+- **CI needs no secrets** — integration tests use a dedicated `canvas_test`
+  DB created/dropped per session; e2e tears the stack down with `-v`.
+- **Deploy staging before production** with a guard step: if staging's
+  `/healthz` smoke fails, production is not promoted. Manual rollback is done
+  in the Render dashboard (previous successful deploy).
+- **Bug fixed during CI bring-up:** the frontend job on Node 20 globbed the
+  wrong test path and alembic needed the DB URL injected into the container —
+  both surfaced by actually running CI, not by reading config.
+- **Verified end-to-end:** after wiring secrets, a push to `main` ran the whole
+  workflow — staging deploy hook → healthy → production deploy hook → healthy
+  (both `/healthz` returned ok).
+
+### 8.3 Module 3 contribution estimate
+
+| Stage | AI | Human | Comment |
+|-------|----|-------|---------|
+| Test/containerize/CI/deploy code | 90% | 10% | Direction and Render account/secrets — human; implementation, debugging, verification — AI |
+| Deploy ops (Render setup, hook URLs, secrets) | 40% | 60% | Human created environments and pasted hook URLs; AI explained where they live and verified via `gh` |
+
+The Module 3 estimate mirrors the earlier modules: the human decided *what*
+(test on the real stack, deploy to Render, staging → production) and supplied
+account-level access; the AI implemented, ran the pipelines, and debugged
+failures found by real runs.
+
+---
+
+## 9. Manual edits
 
 Fields below are for the human to refine. Fill in as needed:
 
