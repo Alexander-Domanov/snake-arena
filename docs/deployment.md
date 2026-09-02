@@ -34,8 +34,8 @@ GitHub (source of truth)
 
 | Environment | Purpose | Public URL |
 |-------------|---------|-----------|
-| Production  | what users see | `https://<app>.onrender.com` |
-| Staging     | pre-prod validation of the same image | `https://<app>-staging.onrender.com` |
+| Production  | what users see | https://interview-canvas.onrender.com |
+| Staging     | pre-prod validation of the same image | https://interview-canvas-staging.onrender.com |
 
 > Both environments run the same image built from the same commit; staging is
 > deployed first and must pass its health check before production is deployed.
@@ -63,8 +63,8 @@ migrations ran and the app can talk to Postgres.
 |--------|-------|
 | `RENDER_STAGING_HOOK_URL` | Deploy hook for the staging environment (Render dashboard → service/environment → Settings → Deploy Hooks) |
 | `RENDER_PRODUCTION_HOOK_URL` | Deploy hook for the production environment |
-| `STAGING_URL` | Public staging URL, e.g. `https://<app>-staging.onrender.com` |
-| `PRODUCTION_URL` | Public production URL, e.g. `https://<app>.onrender.com` |
+| `STAGING_URL` | Public staging URL: https://interview-canvas-staging.onrender.com |
+| `PRODUCTION_URL` | Public production URL: https://interview-canvas.onrender.com |
 
 Deploy hooks contain the auth key in the URL itself — they are secrets, never
 commit them. The workflow only POSTs to them.
@@ -76,8 +76,8 @@ commit them. The workflow only POSTs to them.
 curl -fsS -X POST "https://api.render.com/deploy/srv-XXXX?key=YYYY"
 
 # Health check against a live environment
-curl -fsS https://<app>-staging.onrender.com/healthz
-curl -fsS https://<app>.onrender.com/healthz
+curl -fsS https://interview-canvas-staging.onrender.com/healthz
+curl -fsS https://interview-canvas.onrender.com/healthz
 ```
 
 ## Costs

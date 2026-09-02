@@ -44,6 +44,12 @@ docs/                    testing/deployment/release-process docs, AI usage repor
 - A browser — the frontend is plain HTML/CSS/JS
 - Node.js 18+ — only needed for the frontend tests
 
+## Live
+
+- Production: https://interview-canvas.onrender.com
+- Staging: https://interview-canvas-staging.onrender.com
+- Both expose `GET /healthz` → `{"status":"ok","database":"ok"}`
+
 ## Run locally
 
 Start the backend (from the repo root):
