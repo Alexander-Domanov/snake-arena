@@ -20,6 +20,10 @@ def add_element(client, board_id, **overrides):
     return client.post(f"/boards/{board_id}/elements", json=payload)
 
 
+def update_element(client, element_id, **updates):
+    return client.patch(f"/elements/{element_id}", json=updates)
+
+
 def test_full_lifecycle_on_postgres(client):
     # create board
     r = create_board(client, "integration")
@@ -74,3 +78,69 @@ def test_data_persists_across_sessions(client):
 def test_create_boards_are_unique(client):
     ids = {create_board(client).json()["id"] for _ in range(5)}
     assert len(ids) == 5
+
+
+# ---- PATCH /elements/{element_id} ----
+
+
+def test_patch_text(client):
+    bid = create_board(client).json()["id"]
+    el = add_element(client, bid, type="sticky_note", x=10, y=20, text="before").json()
+
+    r = update_element(client, el["id"], text="after")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["text"] == "after"
+    assert data["x"] == 10 and data["y"] == 20, "position must be unchanged"
+    assert UUID_RE.match(data["id"])
+
+    # persisted: a fresh GET shows the new text
+    board = client.get(f"/boards/{bid}").json()
+    assert board["elements"][0]["text"] == "after"
+
+
+def test_patch_position(client):
+    bid = create_board(client).json()["id"]
+    el = add_element(client, bid, x=10, y=20, text="keep me").json()
+
+    r = update_element(client, el["id"], x=340, y=210)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["x"] == 340 and data["y"] == 210
+    assert data["text"] == "keep me", "text must be unchanged"
+
+
+def test_patch_both_fields(client):
+    bid = create_board(client).json()["id"]
+    el = add_element(client, bid, x=1, y=2, text="old").json()
+
+    r = update_element(client, el["id"], x=55, y=66, text="new")
+    assert r.status_code == 200
+    data = r.json()
+    assert (data["x"], data["y"], data["text"]) == (55.0, 66.0, "new")
+
+
+def test_patch_clear_text_with_null(client):
+    """An explicit null clears the text (distinct from omitting the field)."""
+    bid = create_board(client).json()["id"]
+    el = add_element(client, bid, type="sticky_note", text="to clear").json()
+
+    r = update_element(client, el["id"], text=None)
+    assert r.status_code == 200
+    assert r.json()["text"] is None
+
+
+def test_patch_empty_body_is_noop(client):
+    bid = create_board(client).json()["id"]
+    el = add_element(client, bid, x=7, y=8, text="same").json()
+
+    r = update_element(client, el["id"])
+    assert r.status_code == 200
+    data = r.json()
+    assert (data["x"], data["y"], data["text"]) == (7.0, 8.0, "same")
+
+
+def test_patch_missing_element_404(client):
+    r = update_element(client, MISSING_UUID, x=1)
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Element not found"

@@ -69,6 +69,19 @@ function createMockApi() {
       return jsonResponse(404, { detail: 'Element not found' });
     }
 
+    // PATCH /elements/{id}: partial update (mirrors the backend semantics)
+    if (method === 'PATCH' && m) {
+      for (const board of boards.values()) {
+        const idx = board.elements.findIndex((e) => e.id === m[1]);
+        if (idx !== -1) {
+          const body = JSON.parse(options.body || '{}');
+          board.elements[idx] = { ...board.elements[idx], ...body };
+          return jsonResponse(200, board.elements[idx]);
+        }
+      }
+      return jsonResponse(404, { detail: 'Element not found' });
+    }
+
     return jsonResponse(404, { detail: 'Not found' });
   }
 
@@ -96,6 +109,20 @@ const click = (win, el) => el.dispatchEvent(new win.MouseEvent('click', { bubble
 function pointerDownUp(win, el) {
   el.dispatchEvent(new win.MouseEvent('pointerdown', { bubbles: true, clientX: 0, clientY: 0 }));
   win.dispatchEvent(new win.MouseEvent('pointerup', { bubbles: true, clientX: 0, clientY: 0 }));
+}
+
+// pointerdown on the element, then a real move on the window, then pointerup
+function dragBy(win, el, dx, dy) {
+  el.dispatchEvent(new win.MouseEvent('pointerdown', { bubbles: true, clientX: 0, clientY: 0 }));
+  win.dispatchEvent(new win.MouseEvent('pointermove', { bubbles: true, clientX: dx, clientY: dy }));
+  win.dispatchEvent(new win.MouseEvent('pointerup', { bubbles: true, clientX: dx, clientY: dy }));
+}
+
+// double-click to enter edit mode, set text, then blur (fires stopEditing)
+function editText(win, body, text) {
+  body.dispatchEvent(new win.MouseEvent('dblclick', { bubbles: true }));
+  body.textContent = text;
+  body.dispatchEvent(new win.FocusEvent('blur'));
 }
 
 async function loadPage(api) {
@@ -337,4 +364,103 @@ test('404 on delete: logged to console, no error banner', async () => {
   assert.ok(logs.some((l) => l.includes('Element not found')), '404 detail should be logged');
   assert.equal(doc.getElementById('error-banner').classList.contains('visible'), false, 'no banner for 404');
   assert.ok(api.calls.some((c) => c.method === 'DELETE' && c.path === `/elements/${id}`));
+});
+
+// ---------- persistent editing (PATCH /elements/{id}) ----------
+
+test('edit text on blur: sends PATCH {text} and the server state is updated', async () => {
+  const api = createMockApi();
+  const { doc } = await loadPage(api);
+  const bid = doc.getElementById('board').dataset.boardId;
+
+  click(doc.defaultView, doc.getElementById('btn-sticky'));
+  await waitFor(() => doc.querySelectorAll('.el').length === 1);
+
+  const node = doc.querySelector('.el.sticky');
+  const id = node.dataset.id;
+  const body = node.querySelector('.note-body');
+
+  editText(doc.defaultView, body, 'Rate limiter notes');
+
+  await waitFor(() => api.calls.some((c) => c.method === 'PATCH' && c.path === `/elements/${id}`));
+
+  const patchCall = api.calls.find((c) => c.method === 'PATCH' && c.path === `/elements/${id}`);
+  assert.deepEqual(JSON.parse(patchCall.body), { text: 'Rate limiter notes' }, 'PATCH body should carry only text');
+  assert.equal(api.boards.get(bid).elements[0].text, 'Rate limiter notes', 'server state should reflect the edit');
+});
+
+test('edit with unchanged text: no PATCH is sent', async () => {
+  const api = createMockApi();
+  const { doc } = await loadPage(api);
+
+  click(doc.defaultView, doc.getElementById('btn-sticky'));
+  await waitFor(() => doc.querySelectorAll('.el').length === 1);
+
+  const body = doc.querySelector('.el.sticky .note-body');
+  editText(doc.defaultView, body, ''); // same as the initial empty text
+
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(api.calls.filter((c) => c.method === 'PATCH').length, 0, 'no PATCH for unchanged text');
+});
+
+test('drag: on pointerup sends PATCH {x, y} (only after movement)', async () => {
+  const api = createMockApi();
+  const { doc } = await loadPage(api);
+  const bid = doc.getElementById('board').dataset.boardId;
+
+  click(doc.defaultView, doc.getElementById('btn-sticky'));
+  await waitFor(() => doc.querySelectorAll('.el').length === 1);
+
+  const node = doc.querySelector('.el.sticky');
+  const id = node.dataset.id;
+  const origX = parseFloat(node.style.left);
+  const origY = parseFloat(node.style.top);
+
+  dragBy(doc.defaultView, node, 60, 40);
+
+  await waitFor(() => api.calls.some((c) => c.method === 'PATCH' && c.path === `/elements/${id}`));
+
+  const patchCall = api.calls.find((c) => c.method === 'PATCH' && c.path === `/elements/${id}`);
+  const body = JSON.parse(patchCall.body);
+  assert.equal(body.x, origX + 60, 'PATCH x should be the new left position');
+  assert.equal(body.y, origY + 40, 'PATCH y should be the new top position');
+  assert.equal(api.boards.get(bid).elements[0].x, origX + 60, 'server x should be updated');
+  assert.equal(api.boards.get(bid).elements[0].y, origY + 40, 'server y should be updated');
+});
+
+test('click without movement: no PATCH for position', async () => {
+  const api = createMockApi();
+  const { doc } = await loadPage(api);
+
+  click(doc.defaultView, doc.getElementById('btn-sticky'));
+  await waitFor(() => doc.querySelectorAll('.el').length === 1);
+
+  const node = doc.querySelector('.el.sticky');
+  pointerDownUp(doc.defaultView, node); // select, no move
+
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(api.calls.filter((c) => c.method === 'PATCH').length, 0, 'no PATCH without movement');
+});
+
+test('PATCH 404 (element deleted by another client): logged, no banner, local text kept', async () => {
+  const api = createMockApi();
+  const { dom, doc } = await loadPage(api);
+  const bid = doc.getElementById('board').dataset.boardId;
+
+  const logs = [];
+  dom.window.console.log = (...args) => logs.push(args.map(String).join(' '));
+
+  click(doc.defaultView, doc.getElementById('btn-sticky'));
+  await waitFor(() => doc.querySelectorAll('.el').length === 1);
+
+  const body = doc.querySelector('.el.sticky .note-body');
+  // another client deleted the element while this user was editing
+  api.boards.get(bid).elements = [];
+
+  editText(doc.defaultView, body, 'lost edit');
+
+  await waitFor(() => logs.some((l) => l.includes('404')));
+  assert.ok(logs.some((l) => l.includes('Element not found')), '404 detail should be logged');
+  assert.equal(doc.getElementById('error-banner').classList.contains('visible'), false, 'no banner for 404');
+  assert.equal(body.textContent, 'lost edit', 'local edit should stay visible (no rollback)');
 });

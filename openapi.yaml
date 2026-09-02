@@ -188,6 +188,64 @@ paths:
           $ref: '#/components/responses/ValidationError'
 
   /elements/{element_id}:
+    patch:
+      tags:
+        - elements
+      summary: Update an element
+      description: |
+        Updates editable fields of an existing element (position and/or sticky
+        note text). Only the fields present in the request body are changed —
+        omitted fields keep their current values. Used to persist drag-and-drop
+        (x, y) and text editing on blur.
+      operationId: updateElement
+      parameters:
+        - $ref: '#/components/parameters/ElementIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ElementUpdate'
+            examples:
+              move:
+                summary: Move element (new position)
+                value:
+                  x: 340
+                  y: 210
+              retitle:
+                summary: Edit sticky note text
+                value:
+                  text: Database sharding
+              move-and-retitle:
+                summary: Move and edit text at once
+                value:
+                  x: 340
+                  y: 210
+                  text: Database sharding
+      responses:
+        '200':
+          description: Element updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Element'
+              examples:
+                updated:
+                  summary: Updated element
+                  value:
+                    id: a1b2c3d4-1111-2222-3333-444455556666
+                    board_id: 7f3a2c9e-4b1d-4f6a-9c2e-8d5b1a0e3f77
+                    type: sticky_note
+                    x: 340
+                    y: 210
+                    width: 160
+                    height: 160
+                    text: Database sharding
+                    created_at: '2026-08-31T10:16:05Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     delete:
       tags:
         - elements
@@ -400,6 +458,25 @@ components:
           nullable: true
           maxLength: 500
           description: Sticky note content. Omit for shapes.
+
+    ElementUpdate:
+      type: object
+      description: |
+        Partial update for an existing element. Every field is optional; only
+        the fields present in the request are changed. An empty object is a
+        no-op and returns the element unchanged.
+      properties:
+        x:
+          type: number
+          description: Horizontal position of the element's top-left corner on the canvas.
+        y:
+          type: number
+          description: Vertical position of the element's top-left corner on the canvas.
+        text:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Sticky note content. Null clears the text; omit to keep it.
 
     ElementType:
       type: string

@@ -46,6 +46,19 @@ def add_element(
     return services.add_element(db, str(board_id), payload)
 
 
+@router.patch(
+    "/elements/{element_id}",
+    response_model=schemas.ElementOut,
+    summary="Update an element",
+)
+def patch_element(
+    element_id: uuid.UUID,
+    payload: schemas.ElementUpdate,
+    db: Session = Depends(get_db),
+) -> models.Element:
+    return services.update_element(db, str(element_id), payload)
+
+
 @router.delete(
     "/elements/{element_id}",
     status_code=status.HTTP_204_NO_CONTENT,
