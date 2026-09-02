@@ -30,7 +30,7 @@ backend/                 FastAPI app (main, routes, services, models, schemas, d
 alembic/                 DB migrations (applied automatically on startup/deploy)
 tests/                   pytest unit/API + integration (real Postgres) + frontend jsdom tests
 e2e/                     Playwright E2E tests against the docker-compose stack
-Dockerfile               single container image (uv + Python 3.11, no Node stage)
+Dockerfile               multi-stage image (uv stage + runtime, no Node stage)
 docker-compose.yml       local full stack: Postgres + app with healthchecks
 .github/workflows/       ci.yml (every PR) and deploy.yml (push to main → staging → production)
 render.yaml              Render Blueprint: web service + managed Postgres
@@ -193,8 +193,9 @@ Module 3 (test, containerize, deploy):
 8. **Containerization** – multi-stage `Dockerfile` (uv, no Node stage) and
    `docker-compose.yml` (Postgres + app, healthchecks); migrations run in the
    container entrypoint.
-9. **CI** – `.github/workflows/ci.yml` runs unit, frontend, integration, E2E
-   and the image build on every pull request (no secrets needed).
+9. **CI** – `.github/workflows/ci.yml` runs lint (ruff), unit, frontend,
+   integration, E2E and the image build on every pull request (no secrets
+   needed); branch protection on `main` requires every check to pass.
 10. **Deploy + CD** – `render.yaml` blueprint (web service + managed Postgres on
     Render), `.github/workflows/deploy.yml` promotes staging → production on
     push to `main` via deploy hooks with `/healthz` smoke checks. Docs:

@@ -33,8 +33,10 @@ live
   and a Docker image build.
 - A PR with failing checks should not be merged. CI needs no secrets and uses
   only ephemeral services, so the result is reproducible locally too.
-- GitHub branch protection (if enabled on the repo) enforces this: `main`
-  requires the CI checks to pass before merge.
+- GitHub branch protection is **enabled on `main`**: direct pushes are
+  blocked, a PR is required, and all six CI checks (Lint, Backend unit tests,
+  Frontend tests, Integration tests, E2E tests, Docker image build) must pass
+  before merge. A PR with failing checks cannot be merged.
 
 ## Deploy: merge to main is the release action
 

@@ -55,7 +55,15 @@ npm test
 
 ## Isolation rules
 
-- Unit tests never touch a real database (in-memory SQLite, fresh per test).
+- Unit tests never touch a real database (in-memory SQLite, fresh per test)
+  and always run — even without Docker/Postgres.
+- Integration tests require a reachable Postgres. If it is unavailable they
+  are **skipped** (not failed) at collection time — only tests carrying the
+  `integration` marker, so a plain `uv run pytest` on a machine without
+  Docker still runs the full unit suite and reports integration as skipped.
+  (Historical note: the collection hook used to skip *every* test in the
+  session when Postgres was down, which silently turned the CI unit job into
+  a green no-op; the marker filter fixes that.)
 - Integration tests create a dedicated `canvas_test` database and drop it after
   the session — the dev/CI `canvas` database is never modified.
 - E2E tears the compose stack down with `docker compose down -v` (fresh volume
