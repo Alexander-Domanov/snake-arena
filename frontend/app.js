@@ -281,7 +281,7 @@
     }
   }
 
-  // ---------- sticky note: редактирование текста (локально, API не умеет PATCH) ----------
+  // ---------- sticky note: редактирование текста (сохраняется PATCH'ем по blur) ----------
 
   function startEditing(id) {
     const node = board.querySelector('.el[data-id="' + id + '"]');
