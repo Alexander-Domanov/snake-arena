@@ -103,10 +103,10 @@ head`) before launching the server, exactly like production on Render.
 
 ## CI/CD
 
-- **CI** (`.github/workflows/ci.yml`) runs on every pull request: backend unit
-  tests, frontend jsdom tests, integration tests against a real Postgres
-  service container, E2E tests against the docker-compose stack (Playwright),
-  and a Docker image build.
+- **CI** (`.github/workflows/ci.yml`) runs on every pull request: lint (ruff),
+  backend unit tests, frontend jsdom tests, integration tests against a real
+  Postgres service container, E2E tests against the docker-compose stack
+  (Playwright), and a Docker image build.
 - **Deploy** (`.github/workflows/deploy.yml`) runs on push to `main`: it
   triggers a Render deploy of **staging** via a deploy hook, waits for
   `/healthz`, then promotes to **production** the same way. Rollback is done in

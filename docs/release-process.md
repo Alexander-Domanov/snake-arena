@@ -28,9 +28,9 @@ live
 
 ## CI gate: merge only on green
 
-- CI (`ci.yml`) runs on **every pull request**: unit, frontend, integration
-  against real Postgres, E2E against the full docker-compose stack, and a
-  Docker image build.
+- CI (`ci.yml`) runs on **every pull request**: lint (ruff), unit, frontend,
+  integration against real Postgres, E2E against the full docker-compose stack,
+  and a Docker image build.
 - A PR with failing checks should not be merged. CI needs no secrets and uses
   only ephemeral services, so the result is reproducible locally too.
 - GitHub branch protection (if enabled on the repo) enforces this: `main`

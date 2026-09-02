@@ -1,10 +1,10 @@
 """Alembic migrations against a real database (the deploy path)."""
 import pytest
-from alembic import command
 from alembic.config import Config
+from conftest import ALEMBIC_INI, TEST_URL
 from sqlalchemy import create_engine, inspect
 
-from conftest import ALEMBIC_INI, TEST_URL
+from alembic import command
 
 pytestmark = pytest.mark.integration
 
@@ -43,7 +43,6 @@ def test_upgrade_is_idempotent(test_db):
 
 def test_migration_matches_models(test_db):
     """The migrated schema is what the ORM models declare (no drift)."""
-    from sqlalchemy import MetaData
 
     from backend.database import Base
     from backend.models import Board, Element  # noqa: F401  (register on metadata)

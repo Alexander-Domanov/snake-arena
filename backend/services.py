@@ -58,9 +58,9 @@ def health_check(db: Session) -> dict:
     """Service and database health. Raises 503 when the DB is unreachable."""
     try:
         db.execute(text("SELECT 1"))
-    except SQLAlchemyError:
+    except SQLAlchemyError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
-        )
+        ) from exc
     return {"status": "ok", "database": "ok"}

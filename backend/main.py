@@ -9,11 +9,12 @@ so the same container/image works in dev and production.
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
+from alembic import command
 
 from .routes import router
 

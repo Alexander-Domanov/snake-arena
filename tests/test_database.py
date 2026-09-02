@@ -1,7 +1,7 @@
 """Unit tests for the database configuration (database-agnostic setup)."""
 from backend.database import (
-    DB_PATH,
     DATABASE_URL,
+    DB_PATH,
     PROJECT_ROOT,
     engine,
     normalize_database_url,

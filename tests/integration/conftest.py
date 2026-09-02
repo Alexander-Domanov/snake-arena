@@ -14,7 +14,6 @@ import os
 from pathlib import Path
 
 import pytest
-from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
@@ -22,6 +21,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
+from alembic import command
 from backend.database import get_db
 from backend.main import app
 
@@ -50,15 +50,22 @@ def _postgres_reachable() -> bool:
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip the whole integration suite when Postgres is unreachable.
+    """Skip the integration suite when Postgres is unreachable.
 
     Done at collection time (not via a fixture) so the skip reliably wins
     over any fixture setup that needs the database.
+
+    Important: only skip tests that actually carry the ``integration`` marker.
+    This hook runs for every collected item in the session (pytest collection
+    hooks from a loaded conftest see all items), so without the marker filter
+    a missing Postgres would also skip the unit tests — silently turning the
+    CI "unit" job into a no-op that still reports green.
     """
     if not _postgres_reachable():
         skip = pytest.mark.skip(reason="Postgres unavailable — start it with: docker compose up -d")
         for item in items:
-            item.add_marker(skip)
+            if "integration" in item.keywords:
+                item.add_marker(skip)
 
 
 @pytest.fixture(scope="session")

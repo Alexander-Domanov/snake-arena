@@ -1,11 +1,11 @@
 """Pydantic API contracts — mirrors the schemas in openapi.yaml."""
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 
-class ElementType(str, Enum):
+class ElementType(StrEnum):
     sticky_note = "sticky_note"
     rectangle = "rectangle"
     circle = "circle"
@@ -14,8 +14,8 @@ class ElementType(str, Enum):
 def to_utc_z(dt: datetime) -> str:
     """Serialize an aware datetime as RFC3339 UTC with 'Z' (matches openapi.yaml examples)."""
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 class BoardCreate(BaseModel):

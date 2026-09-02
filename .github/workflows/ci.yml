@@ -1,4 +1,5 @@
 # CI — runs on every pull request:
+#   - lint (ruff)
 #   - backend unit tests (in-memory SQLite, no services needed)
 #   - frontend tests (jsdom + node:test)
 #   - integration tests against real Postgres (GitHub Actions service)
@@ -23,6 +24,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Run ruff check
+        run: uv run ruff check backend tests e2e alembic
+
   backend-unit:
     name: Backend unit tests
     runs-on: ubuntu-latest
