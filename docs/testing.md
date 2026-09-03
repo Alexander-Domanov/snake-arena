@@ -41,6 +41,11 @@ npm test
 - `tests/test_api.py` — API contract: 201/204/200/404/422, enum validation
   (`sticky_note` vs `sticky`), UUID validation, cascade delete, date format,
   board lifecycle (create → get → add → PATCH update → delete).
+- `tests/test_telemetry.py` — OTel application metrics (in-memory
+  MeterProvider, no collector): boards/elements counters, creation-failure
+  counter by reason, active-board gauge, resource labels
+  (service.name/service.version/deployment.environment), and the env gating
+  (telemetry off without `OTEL_EXPORTER_OTLP_ENDPOINT`).
 - `tests/frontend/app.test.mjs` — the real `frontend/index.html` + `app.js`
   loaded into jsdom with a mocked `fetch` (an in-memory fake mirroring
   `openapi.yaml`): create a board on load, add/delete elements with correct

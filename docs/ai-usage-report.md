@@ -1,6 +1,6 @@
 # AI Usage Report — Interview Canvas
 
-Date: 2026-08-31 (Modules 1–2); updated 2026-09-02 (Module 3)
+Date: 2026-08-31 (Modules 1–2); updated 2026-09-02 (Module 3); updated 2026-09-03 (Module 4)
 Project: Interview Canvas — collaborative whiteboard for system design interviews
 Stack: HTML/CSS/JS (frontend), FastAPI + SQLAlchemy (backend), OpenAPI 3.0, pytest, uv, Docker, GitHub Actions, Render
 
@@ -286,6 +286,45 @@ Lesson: a green deploy workflow does not prove new code is live; verify the
 deployed artifact (e.g. `/openapi.json`), and keep the platform branch in
 sync with the release branch. Fix: fast-forwarded `module3` to `main` and
 re-ran the deploy.
+
+### 8.5 Module 4 — DevOps and Observability, 2026-09-03
+
+Work done against the Module 4 article requirements (dev/prod model,
+container registry, OpenTelemetry, dashboards, alerting, AI on-call).
+
+| Stage | AI role | Result |
+|-------|---------|--------|
+| Dev/prod promotion | Researched current deploy.yml, rewrote to dev-auto/prod-manual | PR #7: push → staging only; production via workflow_dispatch with staging-health guard; docs synced |
+| Registry decision | Read Render docs (deploying-an-image, deploy hooks `imgURL`, API) to choose GHCR path with facts | PR #8 (open): build-once → GHCR `YYYYMMDD-HHMMSS-sha` tags → imgURL deploys; **blocked on human dashboard migration** |
+| OTel instrumentation | Designed `backend/telemetry.py` (env-gated, resource labels), wired counters into routes | Metrics/traces/logs export over OTLP; 6 new unit tests |
+| Observability stack | Wrote `observability/` compose project + provisioning | Collector → Prometheus/Loki/Tempo; Grafana dashboard w/ env+version filters; Alertmanager; verified e2e locally |
+| Alerting | Wrote Prometheus alert rule (sustained failures, annotated with service/env/version/owner/dashboard) | Alert fires → Alertmanager active (verified with generated failures) |
+| On-call engineer | Wrote `on-call-engineer/poll.py` (poll Alertmanager → headless agent) | Dry-run verified; full loop verified in the bug demo |
+| Bug demo | Introduced reproducible bug, then acted as orchestrator for the on-call agent | Bug → alert → on-call agent found root cause, fixed, tested, committed (`c1bb27c`, demo branch) |
+
+Bugs/lessons found during the module:
+
+1. **Prometheus templates have no `default` function** — the alert rule
+   initially used `| default "unknown"` and Prometheus refused to start.
+2. **Root logger level under uvicorn is WARNING** — INFO log records were
+   dropped before the OTel logging handler could export them; raise the root
+   level when telemetry is enabled.
+3. **OTel global MeterProvider cannot be replaced** — unit tests must install
+   one provider for the module and assert metric deltas, not absolutes.
+4. **The collector's Prometheus exporter appends unit suffixes** (e.g.
+   `_elements`) — instruments are created without `unit` so exported names
+   stay predictable for dashboards and alert rules.
+5. **Render git-backed services cannot deploy a specific image tag** — the
+   registry migration needs image-backed services created in the dashboard
+   (human step; cannot be automated without a Render API key / PAT).
+6. **No headless coding-agent CLI installed locally** (codex/claude/opencode
+   absent) — the on-call role in the demo was executed by a Hermes subagent
+   with the same brief the poller would give a CLI agent.
+
+Human steps still required (platform accounts): Render dashboard migration
+for PR #8 (GHCR registry credential, two image-backed services, hook URLs),
+deploying/choosing a managed observability backend for staging+production,
+and final cleanup of temporary Render resources.
 
 ---
 
