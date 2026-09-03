@@ -1,10 +1,17 @@
-# Deploy — Render (deploy hooks) with staging -> production promotion.
+# Deploy — Render (deploy hooks). Dev/staging auto-deploys on push; production
+# is promoted manually (Module 4 dev/prod model).
 #
 # Flow:
-#   push to main        -> deploy staging (hook) -> smoke /healthz -> deploy production -> smoke /healthz
-#   workflow_dispatch   -> deploy the chosen environment (staging or production); use this
-#                          to re-run a deploy. Rollback is done in the Render dashboard
-#                          (Service -> Deploy -> previous successful deploy).
+#   push to main        -> deploy STAGING only (development): hook -> /healthz smoke
+#   workflow_dispatch   -> deploy the chosen environment:
+#                            staging   : re-run a staging deploy (same as push)
+#                            production: MANUAL promotion. Runs only when a human
+#                                        starts the workflow; staging must be
+#                                        healthy first (guard step).
+#
+# Every push reaches development; production receives only explicitly promoted
+# releases. Rollback is done in the Render dashboard (Service -> Deploy ->
+# previous successful deploy).
 #
 # Required GitHub secrets:
 #   RENDER_STAGING_HOOK_URL     - Render deploy hook for the staging environment/service
@@ -13,7 +20,10 @@
 #   PRODUCTION_URL              - public production URL, e.g. https://your-app.onrender.com
 #
 # Render builds the image from the repo (Dockerfile) and runs migrations via the
-# entrypoint (alembic upgrade head), so no deploy-time migration step is needed here.
+# entrypoint (alembic upgrade head), so no deploy-time migration step is needed
+# here. Both environments deploy from the same repo state: staging is the tested
+# image, production promotion deploys the current main HEAD — promote right
+# after staging is verified, before the next merge changes HEAD.
 
 name: Deploy
 
@@ -23,9 +33,8 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Which environment to deploy
+        description: Which environment to deploy (production = manual promotion; staging must be healthy first)
         required: true
-        default: production
         type: choice
         options: [staging, production]
 
@@ -35,6 +44,7 @@ concurrency:
 
 jobs:
   deploy-staging:
+    name: Deploy staging (development)
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -56,16 +66,20 @@ jobs:
           exit 1
 
   deploy-production:
-    needs: deploy-staging
-    if: always() && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production'))
+    name: Promote to production (manual)
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'production'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Guard — do not promote when staging failed
-        if: github.event_name == 'push' && needs.deploy-staging.result != 'success'
+      - name: Guard - staging must be healthy before promotion
         run: |
-          echo "staging did not pass; not deploying to production" >&2
-          exit 1
+          url="${{ secrets.STAGING_URL }}"
+          if curl -fsS --max-time 10 "$url/healthz" 2>/dev/null | grep -q '"ok"'; then
+            echo "staging is healthy; promoting to production"
+          else
+            echo "staging is not healthy; refusing to promote to production" >&2
+            exit 1
+          fi
       - name: Trigger Render deploy (production)
         run: curl -fsS -X POST "${{ secrets.RENDER_PRODUCTION_HOOK_URL }}"
       - name: Wait for production health
