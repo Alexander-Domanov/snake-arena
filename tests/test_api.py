@@ -225,3 +225,14 @@ def test_healthz_ok(client):
     r = client.get("/healthz")
     assert r.status_code == 200
     assert r.json() == {"status": "ok", "database": "ok"}
+
+
+# ---- static frontend ----
+
+def test_frontend_served_with_no_cache(client):
+    """Static assets must force revalidation, or browsers cache stale JS."""
+    for path in ("/", "/app.js", "/style.css"):
+        r = client.get(path)
+        assert r.status_code == 200, f"{path} should be served"
+        assert r.headers.get("cache-control") == "no-cache", f"{path} should be no-cache"
+    assert "text/html" in client.get("/").headers["content-type"]
