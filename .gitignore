@@ -16,3 +16,6 @@ db.sqlite3
 
 # Node (frontend tests)
 node_modules/
+
+# On-call engineer poller state (which alerts were already handled)
+on-call-engineer/.handled-alerts.json
