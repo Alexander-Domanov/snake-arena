@@ -18,7 +18,11 @@ full-stack app (static frontend + FastAPI backend over an OpenAPI contract,
 SQLite for local dev) proven by unit/integration/E2E tests, packaged in a
 container, checked by CI on every pull request, and deployed to staging
 (development) and production on Render — staging automatically on merge to
-`main`, production via manual promotion.
+`main`, production via manual promotion. Since Module 4 the backend is
+instrumented with OpenTelemetry (metrics, traces, logs) and the repo ships a
+local observability stack (Prometheus / Loki / Tempo / Grafana) plus a
+Prometheus alert and an on-call-engineer poller that hands firing alerts to a
+headless coding agent.
 
 ## Repository layout
 
@@ -35,6 +39,8 @@ Dockerfile               multi-stage image (uv stage + runtime, no Node stage)
 docker-compose.yml       local full stack: Postgres + app with healthchecks
 .github/workflows/       ci.yml (every PR) and deploy.yml (push to main → staging → production)
 render.yaml              Render Blueprint: web service + managed Postgres
+observability/           local OTel stack (separate compose project): collector, Prometheus, Loki, Tempo, Grafana, Alertmanager
+on-call-engineer/        Alertmanager poller that wakes a headless coding agent on firing alerts
 docs/                    testing/deployment/release-process docs, AI usage report, screenshots
 ```
 
@@ -102,6 +108,27 @@ docker build -t interview-canvas:latest .
 On container start the entrypoint applies DB migrations (`alembic upgrade
 head`) before launching the server, exactly like production on Render.
 
+## Run with observability (Module 4)
+
+Start the telemetry stack (a separate compose project; it does not touch the
+app stack):
+
+```bash
+docker compose -f observability/docker-compose.yml up -d
+```
+
+Run the app with telemetry pointing at the collector:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 uv run uvicorn backend.main:app --reload
+```
+
+Open Grafana at http://localhost:3000 (admin/admin) → dashboard *Interview
+Canvas Overview*; create a board and add elements in the app — metrics
+appear within ~30s. Details: `observability/README.md`. Telemetry is inert
+when `OTEL_EXPORTER_OTLP_ENDPOINT` is not set, so the app runs fine without
+the stack.
+
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`) runs on every pull request: lint (ruff),
@@ -166,6 +193,9 @@ CI runs all of these on every pull request (`.github/workflows/ci.yml`).
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `DATABASE_URL` | `sqlite:///./db.sqlite3` | SQLAlchemy connection string. Set to a Postgres URL to swap databases without code changes (install the matching driver, e.g. `psycopg`) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | *(unset → telemetry off)* | When set (e.g. `http://localhost:4318`), enables OpenTelemetry export of metrics/traces/logs to that endpoint |
+| `ENVIRONMENT` | `development` | `deployment.environment` resource label on all telemetry (e.g. `staging`, `production`) |
+| `APP_VERSION` | `0.1.0` | `service.version` resource label on all telemetry |
 
 ## How it was built (AI-native full-stack workflow)
 
@@ -208,6 +238,28 @@ Module 3 (test, containerize, deploy):
     agents.
 12. **AI usage report** – `docs/ai-usage-report.md` documents prompts, bugs,
     lessons, and the split between AI and human contributions.
+
+Module 4 (dev/prod, observability, on-call):
+
+13. **Dev/prod promotion** – every push deploys staging (development);
+    production is promoted manually (workflow_dispatch + staging-health
+    guard). Container-registry migration (GHCR, image tags, imgURL deploys)
+    is prepared in a separate PR (awaits Render dashboard steps).
+14. **OpenTelemetry** – `backend/telemetry.py` exports metrics/traces/logs
+    over OTLP (inert without `OTEL_EXPORTER_OTLP_ENDPOINT`); application
+    metrics: boards created, elements created by type, creation failures by
+    reason, active boards (5-min window). Resource labels carry environment
+    and deployed version.
+15. **Observability stack** – `observability/` compose project (OTel
+    Collector, Prometheus, Loki, Tempo, Grafana, Alertmanager) with a
+    provisioned dashboard filtered by env/version and an alert on sustained
+    element-creation failures. Verified end-to-end locally (metrics in
+    Prometheus, traces in Tempo, logs in Loki, alert firing in Alertmanager).
+16. **On-call engineer** – `on-call-engineer/poll.py` polls Alertmanager
+    every minute and hands firing alerts (service/env/version/owner/dashboard
+    URL) to a headless coding agent. Demo: introduced a reproducible bug,
+    the alert fired, and the agent found the root cause, fixed it, ran the
+    tests and committed.
 
 All steps were verified by running the app locally and passing the CI suites
 (unit, integration against Postgres, E2E on the compose stack).
