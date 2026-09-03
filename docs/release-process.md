@@ -20,8 +20,12 @@ GitHub Actions CI (every pull request)
 merge to main
    ▼
 GitHub Actions Deploy (push to main)
-   ├─ staging: deploy hook → Render build → migrate → start → /healthz smoke
-   ├─ production: only if staging passed → deploy hook → smoke
+   └─ staging (development): deploy hook → Render build → migrate → start → /healthz smoke
+   │
+   │  human verifies staging
+   ▼
+manual promotion (Actions → Deploy → workflow_dispatch → production)
+   └─ guard: staging /healthz ok → deploy hook → smoke
    ▼
 live
 ```
@@ -38,24 +42,34 @@ live
   Frontend tests, Integration tests, E2E tests, Docker image build) must pass
   before merge. A PR with failing checks cannot be merged.
 
-## Deploy: merge to main is the release action
+## Deploy: merge to main reaches development; production is a manual promotion
 
-- Merging to `main` triggers the Deploy workflow — this is the single release
-  action; there is no separate manual "deploy to production" button in the
-  happy path.
-- **Staging first, then production.** The workflow POSTs to the staging deploy
-  hook, waits for staging `/healthz` to return ok, and only then POSTs to the
-  production deploy hook. If staging fails, the guard step aborts production
-  promotion — a broken commit never reaches users automatically.
+- Merging to `main` triggers the Deploy workflow, which deploys **staging**
+  (the development environment) — every merged commit is validated there
+  automatically.
+- **Production is never deployed automatically.** It is promoted by a human:
+  **Actions → Deploy → Run workflow → `production`**. This is the single
+  release action for production (Module 4 dev/prod model: push → dev,
+  promote → prod).
+- The promotion job runs a guard first: staging `/healthz` must be ok. If the
+  development environment is unhealthy, promotion is refused — a broken commit
+  never reaches users.
 - Render builds the image from the repository at that commit, runs
   `alembic upgrade head` in the entrypoint, starts the server, and Render's own
   health check on `/healthz` confirms the app can reach Postgres.
+- Both environments deploy the current `main` HEAD at trigger time, so promote
+  soon after staging is verified — a later merge changes the HEAD that the
+  promotion deploys.
 
 ## Manual deploy / re-run
 
 From GitHub: **Actions → Deploy → Run workflow**, choose `staging` or
-`production`. This is useful to re-run a deploy without a code change or to
-deploy an environment independently.
+`production`.
+
+- `staging` re-runs a staging deploy without a code change (same as the push
+  path).
+- `production` is the manual promotion step: staging must be healthy (guard),
+  then production is deployed and smoke-tested.
 
 ## Rollback
 
@@ -68,7 +82,7 @@ Rollback is done in the Render dashboard, not by reverting the commit:
    back across a schema change.
 
 The equivalent for CI is `git revert` + PR + merge, which runs the full
-pipeline again.
+pipeline again (staging deploy; production still needs a manual promotion).
 
 ## Rules of thumb
 
@@ -77,4 +91,5 @@ pipeline again.
 - All API changes land in `openapi.yaml` first; CI and tests keep backend and
   contract in sync.
 - Never push to `main` directly for a feature — always through a PR with a
-  green CI run. The Deploy workflow fires on push to main by design.
+  green CI run. The Deploy workflow fires on push to main by design (staging
+  only); production changes need the manual promotion on top.

@@ -1,21 +1,24 @@
 # Deployment
 
 Interview Canvas is deployed on Render as a Docker web service with a managed
-Postgres database. There are two environments: **staging** (validation) and
-**production** (public). Deploys are triggered from GitHub Actions via Render
-deploy hooks, so the pipeline is: merge to `main` → build on Render →
-migrate → start → smoke test → same for the other environment.
+Postgres database. There are two environments: **staging** (development —
+deploys automatically on every merge to `main`) and **production** (public —
+deploys only through a manual promotion). Deploys are triggered from GitHub
+Actions via Render deploy hooks: merge to `main` → build on Render → migrate →
+start → smoke test on staging; production is promoted by hand from
+**Actions → Deploy → Run workflow → production**.
 
 ## Architecture
 
 ```text
 GitHub (source of truth)
-  └─ .github/workflows/deploy.yml        (triggered on push to main)
-       ├─ POST staging deploy hook  ──►  Render staging environment
-       │                                   builds image from Dockerfile,
-       │                                   runs migrations (entrypoint),
-       │                                   starts on :8000, /healthz
-       └─ POST production deploy hook ──►  Render production environment
+  └─ .github/workflows/deploy.yml
+       ├─ push to main ──────────────────────────►  Render staging environment
+       │      (development, automatic)              builds image from Dockerfile,
+       │                                             runs migrations (entrypoint),
+       │                                             starts on :8000, /healthz
+       └─ workflow_dispatch (manual, human choice) ─►  Render production environment
+              └─ guard: staging /healthz must be ok    (public; promotion only)
 ```
 
 - **Infrastructure as code**: `render.yaml` (Render Blueprint) provisions the
@@ -32,23 +35,33 @@ GitHub (source of truth)
 
 ## Environments
 
-| Environment | Purpose | Public URL |
-|-------------|---------|-----------|
-| Production  | what users see | https://interview-canvas.onrender.com |
-| Staging     | pre-prod validation of the same image | https://interview-canvas-staging.onrender.com |
+| Environment | Role | Deploys | Public URL |
+|-------------|------|---------|-----------|
+| Production  | what users see | manually promoted (workflow_dispatch) | https://interview-canvas.onrender.com |
+| Staging     | development: pre-prod validation | automatically on every merge to `main` | https://interview-canvas-staging.onrender.com |
 
-> Both environments run the same image built from the same commit; staging is
-> deployed first and must pass its health check before production is deployed.
+> Staging is the development environment: every merged commit lands there and
+> is smoke-tested. Production is updated only by a manual promotion of a
+> release that has already been verified on staging (Module 4 dev/prod model:
+> push → dev, promote → prod).
 
 ## Deploy flow
 
-1. Push to `main` (or run the workflow manually via
-   **Actions → Deploy → Run workflow**, choosing staging or production).
-2. `deploy-staging` job POSTs to `RENDER_STAGING_HOOK_URL`, then polls
-   `<STAGING_URL>/healthz` until it returns `{"ok": ...}` (up to 5 minutes).
-3. `deploy-production` job runs only if staging succeeded (guard step), POSTs
-   to `RENDER_PRODUCTION_HOOK_URL`, then polls `<PRODUCTION_URL>/healthz`.
-4. A failed staging deploy blocks production promotion.
+1. Merge to `main` → `deploy-staging` job POSTs to `RENDER_STAGING_HOOK_URL`
+   and polls `<STAGING_URL>/healthz` until it returns ok (up to 5 minutes).
+   Every push to `main` reaches staging — this is the development environment.
+2. Production is **not** deployed automatically. To promote, a human runs
+   **Actions → Deploy → Run workflow** and chooses `production`.
+3. `deploy-production` first runs a guard: staging `/healthz` must be ok
+   (i.e. the release was actually verified on development). If staging is
+   unhealthy, promotion is refused.
+4. The guard passes → POST to `RENDER_PRODUCTION_HOOK_URL` → poll
+   `<PRODUCTION_URL>/healthz`.
+
+Both environments deploy the current `main` HEAD at trigger time: staging
+right after the merge, production whenever the human promotes. Promote soon
+after staging is verified — a later merge would change the HEAD that the
+promotion deploys.
 
 ## Health check
 

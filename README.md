@@ -16,8 +16,9 @@ Collaborative whiteboard for system design interviews: sticky notes and basic
 shapes on a shared board. This is the Module 3 deliverable — the Module 2
 full-stack app (static frontend + FastAPI backend over an OpenAPI contract,
 SQLite for local dev) proven by unit/integration/E2E tests, packaged in a
-container, checked by CI on every pull request, and deployed to staging and
-production on Render with automatic deploys on merge to `main`.
+container, checked by CI on every pull request, and deployed to staging
+(development) and production on Render — staging automatically on merge to
+`main`, production via manual promotion.
 
 ## Repository layout
 
@@ -107,10 +108,12 @@ head`) before launching the server, exactly like production on Render.
   backend unit tests, frontend jsdom tests, integration tests against a real
   Postgres service container, E2E tests against the docker-compose stack
   (Playwright), and a Docker image build.
-- **Deploy** (`.github/workflows/deploy.yml`) runs on push to `main`: it
-  triggers a Render deploy of **staging** via a deploy hook, waits for
-  `/healthz`, then promotes to **production** the same way. Rollback is done in
-  the Render dashboard (previous successful deploy).
+- **Deploy** (`.github/workflows/deploy.yml`) runs on push to `main` and
+  deploys **staging** (development) via a Render deploy hook, waiting for
+  `/healthz`. Production is **not** automatic: promote manually via
+  **Actions → Deploy → Run workflow → `production`** (a guard requires staging
+  to be healthy first). Rollback is done in the Render dashboard (previous
+  successful deploy).
 
 Deployment details, the release process and the test strategy are documented
 in `docs/deployment.md`, `docs/release-process.md` and `docs/testing.md`.
@@ -197,8 +200,9 @@ Module 3 (test, containerize, deploy):
    integration, E2E and the image build on every pull request (no secrets
    needed); branch protection on `main` requires every check to pass.
 10. **Deploy + CD** – `render.yaml` blueprint (web service + managed Postgres on
-    Render), `.github/workflows/deploy.yml` promotes staging → production on
-    push to `main` via deploy hooks with `/healthz` smoke checks. Docs:
+    Render), `.github/workflows/deploy.yml` deploys staging automatically on
+    push to `main`; production is promoted manually (Module 4 dev/prod model)
+    via deploy hooks with `/healthz` smoke checks. Docs:
     `docs/testing.md`, `docs/deployment.md`, `docs/release-process.md`.
 11. **Context engineering** – `AGENTS.md` provides commands and rules for AI coding
     agents.
