@@ -16,6 +16,8 @@ from fastapi.staticfiles import StaticFiles
 
 from alembic import command
 
+from . import telemetry
+from .database import engine
 from .routes import router
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -41,6 +43,9 @@ class NoCacheStaticFiles(StaticFiles):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # OpenTelemetry: inert unless OTEL_EXPORTER_OTLP_ENDPOINT is set (see
+    # backend/telemetry.py). Must run before traffic starts.
+    telemetry.setup_telemetry(app=app, engine=engine)
     # Migrations run on startup (idempotent): a fresh DB gets the schema here,
     # and production runs the same command as part of the deploy.
     command.upgrade(Config(str(ALEMBIC_INI)), "head")

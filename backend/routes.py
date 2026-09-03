@@ -1,10 +1,10 @@
 """API routes — exactly the five endpoints from openapi.yaml."""
 import uuid
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from . import models, schemas, services
+from . import models, schemas, services, telemetry
 from .database import get_db
 
 router = APIRouter()
@@ -20,7 +20,10 @@ def create_board(
     payload: schemas.BoardCreate | None = None,
     db: Session = Depends(get_db),
 ) -> models.Board:
-    return services.create_board(db, payload)
+    board = services.create_board(db, payload)
+    telemetry.boards_created.add(1)
+    telemetry.record_board_activity(str(board.id))
+    return board
 
 
 @router.get(
@@ -29,7 +32,9 @@ def create_board(
     summary="Get a board",
 )
 def get_board(board_id: uuid.UUID, db: Session = Depends(get_db)) -> models.Board:
-    return services.get_board(db, str(board_id))
+    board = services.get_board(db, str(board_id))
+    telemetry.record_board_activity(str(board.id))
+    return board
 
 
 @router.post(
@@ -43,7 +48,24 @@ def add_element(
     payload: schemas.ElementCreate,
     db: Session = Depends(get_db),
 ) -> models.Element:
-    return services.add_element(db, str(board_id), payload)
+    try:
+        element = services.add_element(db, str(board_id), payload)
+    except HTTPException as exc:
+        # 404 (board missing) is the only business failure today; 422 request
+        # validation errors happen before this handler and are not counted.
+        reason = (
+            "board_not_found"
+            if exc.status_code == status.HTTP_404_NOT_FOUND
+            else f"http_{exc.status_code}"
+        )
+        telemetry.element_creation_failures.add(1, {"reason": reason})
+        raise
+    except Exception:
+        telemetry.element_creation_failures.add(1, {"reason": "internal_error"})
+        raise
+    telemetry.elements_created.add(1, {"type": payload.type.value})
+    telemetry.record_board_activity(str(board_id))
+    return element
 
 
 @router.patch(
