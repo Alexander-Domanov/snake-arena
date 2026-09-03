@@ -33,8 +33,8 @@ tests/                   pytest unit/API + integration (real Postgres) + fronten
 e2e/                     Playwright E2E tests against the docker-compose stack
 Dockerfile               multi-stage image (uv stage + runtime, no Node stage)
 docker-compose.yml       local full stack: Postgres + app with healthchecks
-.github/workflows/       ci.yml (every PR) and deploy.yml (push to main → staging → production)
-render.yaml              Render Blueprint: web service + managed Postgres
+.github/workflows/       ci.yml (every PR) and deploy.yml (build → GHCR → staging; manual prod promotion)
+render.yaml              Render Blueprint: managed Postgres (provisioning record; web services are image-backed from GHCR)
 docs/                    testing/deployment/release-process docs, AI usage report, screenshots
 ```
 
@@ -108,12 +108,14 @@ head`) before launching the server, exactly like production on Render.
   backend unit tests, frontend jsdom tests, integration tests against a real
   Postgres service container, E2E tests against the docker-compose stack
   (Playwright), and a Docker image build.
-- **Deploy** (`.github/workflows/deploy.yml`) runs on push to `main` and
-  deploys **staging** (development) via a Render deploy hook, waiting for
-  `/healthz`. Production is **not** automatic: promote manually via
-  **Actions → Deploy → Run workflow → `production`** (a guard requires staging
-  to be healthy first). Rollback is done in the Render dashboard (previous
-  successful deploy).
+- **Deploy** (`.github/workflows/deploy.yml`) runs on push to `main`: it
+  builds the image and pushes it to GHCR (`ghcr.io/alexander-domanov/snake-arena`,
+  tagged `YYYYMMDD-HHMMSS-<sha>`), then deploys that exact tag to **staging**
+  (development) via a Render deploy hook, waiting for `/healthz`. Production
+  is **not** automatic: promote manually via
+  **Actions → Deploy → Run workflow → `production`**, pasting the image tag
+  verified on staging (a guard requires staging to be healthy first). Rollback
+  is done in the Render dashboard (previous successful deploy).
 
 Deployment details, the release process and the test strategy are documented
 in `docs/deployment.md`, `docs/release-process.md` and `docs/testing.md`.
@@ -199,11 +201,12 @@ Module 3 (test, containerize, deploy):
 9. **CI** – `.github/workflows/ci.yml` runs lint (ruff), unit, frontend,
    integration, E2E and the image build on every pull request (no secrets
    needed); branch protection on `main` requires every check to pass.
-10. **Deploy + CD** – `render.yaml` blueprint (web service + managed Postgres on
-    Render), `.github/workflows/deploy.yml` deploys staging automatically on
-    push to `main`; production is promoted manually (Module 4 dev/prod model)
-    via deploy hooks with `/healthz` smoke checks. Docs:
-    `docs/testing.md`, `docs/deployment.md`, `docs/release-process.md`.
+10. **Deploy + CD** – the image is built once in CI and pushed to GHCR with a
+    `YYYYMMDD-HHMMSS-<sha>` tag; Render services are image-backed and pull that
+    exact image. `.github/workflows/deploy.yml` deploys staging automatically
+    on push to `main`; production is promoted manually (Module 4 dev/prod
+    model) with the same image tag. Docs: `docs/testing.md`,
+    `docs/deployment.md`, `docs/release-process.md`.
 11. **Context engineering** – `AGENTS.md` provides commands and rules for AI coding
     agents.
 12. **AI usage report** – `docs/ai-usage-report.md` documents prompts, bugs,

@@ -1,29 +1,32 @@
-# Deploy — Render (deploy hooks). Dev/staging auto-deploys on push; production
-# is promoted manually (Module 4 dev/prod model).
+# Deploy — GHCR registry flow (Module 4 dev/prod model).
+#
+# Split build and deploy (the article's "container repository" step):
+#   1. build-and-push: builds the image and pushes it to GHCR with tags
+#      YYYYMMDD-HHMMSS-shortsha (and :latest). No deploy happens if the build
+#      fails.
+#   2. deploy-staging: triggers a Render deploy of the image-backed staging
+#      service, passing the EXACT built tag via the hook's imgURL parameter.
+#   3. deploy-production: MANUAL promotion. A human runs the workflow, chooses
+#      production and pastes the image tag currently running on staging; the
+#      same image is pulled and served in production (same-image guarantee).
 #
 # Flow:
-#   push to main        -> deploy STAGING only (development): hook -> /healthz smoke
-#   workflow_dispatch   -> deploy the chosen environment:
-#                            staging   : re-run a staging deploy (same as push)
-#                            production: MANUAL promotion. Runs only when a human
-#                                        starts the workflow; staging must be
-#                                        healthy first (guard step).
+#   push to main        -> build+push -> deploy staging (development)
+#   workflow_dispatch:
+#     staging           -> build+push again -> deploy staging (re-run)
+#     production        -> no build: promote the tag the human provides
 #
-# Every push reaches development; production receives only explicitly promoted
-# releases. Rollback is done in the Render dashboard (Service -> Deploy ->
-# previous successful deploy).
+# Prerequisites (Render dashboard, once):
+#   - the two Render services are IMAGE-BACKED (New -> Web Service ->
+#     Existing Image), pointing at ghcr.io/alexander-domanov/snake-arena:latest
+#   - a GHCR registry credential (GitHub PAT with read:packages) is attached to
+#     those services (Workspace Settings -> Container Registry Credentials)
+#   - RENDER_STAGING_HOOK_URL / RENDER_PRODUCTION_HOOK_URL point at the
+#     image-backed staging and production services
+#   - STAGING_URL / PRODUCTION_URL are their public URLs
 #
-# Required GitHub secrets:
-#   RENDER_STAGING_HOOK_URL     - Render deploy hook for the staging environment/service
-#   RENDER_PRODUCTION_HOOK_URL  - Render deploy hook for the production environment/service
-#   STAGING_URL                 - public staging URL, e.g. https://your-app-staging.onrender.com
-#   PRODUCTION_URL              - public production URL, e.g. https://your-app.onrender.com
-#
-# Render builds the image from the repo (Dockerfile) and runs migrations via the
-# entrypoint (alembic upgrade head), so no deploy-time migration step is needed
-# here. Both environments deploy from the same repo state: staging is the tested
-# image, production promotion deploys the current main HEAD — promote right
-# after staging is verified, before the next merge changes HEAD.
+# Rollback: Render dashboard -> previous successful deploy (the image must
+# remain in GHCR, so old tags are kept, not overwritten).
 
 name: Deploy
 
@@ -33,24 +36,78 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Which environment to deploy (production = manual promotion; staging must be healthy first)
+        description: Which environment to deploy
         required: true
         type: choice
         options: [staging, production]
+      image_tag:
+        description: >-
+          Image tag to promote to production (e.g. 20260903-153012-a1b2c3d —
+          the tag shown in the last successful staging deploy). Required when
+          environment = production.
+        required: false
+        type: string
 
 concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  IMAGE: ghcr.io/alexander-domanov/snake-arena
+
 jobs:
+  build-and-push:
+    name: Build & push image (GHCR)
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image tag (YYYYMMDD-HHMMSS-shortsha)
+        id: tag
+        run: |
+          TAG="$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)"
+          echo "image_tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "tag: $TAG"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.tag.outputs.image_tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy-staging:
     name: Deploy staging (development)
+    needs: build-and-push
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Trigger Render deploy (staging)
-        run: curl -fsS -X POST "${{ secrets.RENDER_STAGING_HOOK_URL }}"
+      - name: Trigger Render deploy (staging) with the built image tag
+        run: |
+          TAG="${{ needs.build-and-push.outputs.image_tag }}"
+          IMGURL="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "${{ env.IMAGE }}@${TAG}")"
+          curl -fsS -X POST "${{ secrets.RENDER_STAGING_HOOK_URL }}&imgURL=${IMGURL}"
+          echo "deploying ${{ env.IMAGE }}@${TAG} to staging"
+
       - name: Wait for staging health
         run: |
           url="${{ secrets.STAGING_URL }}"
@@ -71,6 +128,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Guard - an image tag must be provided
+        run: |
+          TAG="${{ inputs.image_tag }}"
+          if ! echo "$TAG" | grep -Eq '^[0-9]{8}-[0-9]{6}-[0-9a-f]{7,}$'; then
+            echo "invalid or missing image_tag (expected YYYYMMDD-HHMMSS-shortsha): $TAG" >&2
+            exit 1
+          fi
+          echo "promoting ${{ env.IMAGE }}@${TAG}"
+
       - name: Guard - staging must be healthy before promotion
         run: |
           url="${{ secrets.STAGING_URL }}"
@@ -80,8 +146,14 @@ jobs:
             echo "staging is not healthy; refusing to promote to production" >&2
             exit 1
           fi
-      - name: Trigger Render deploy (production)
-        run: curl -fsS -X POST "${{ secrets.RENDER_PRODUCTION_HOOK_URL }}"
+
+      - name: Trigger Render deploy (production) with the promoted image tag
+        run: |
+          TAG="${{ inputs.image_tag }}"
+          IMGURL="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "${{ env.IMAGE }}@${TAG}")"
+          curl -fsS -X POST "${{ secrets.RENDER_PRODUCTION_HOOK_URL }}&imgURL=${IMGURL}"
+          echo "deploying ${{ env.IMAGE }}@${TAG} to production"
+
       - name: Wait for production health
         run: |
           url="${{ secrets.PRODUCTION_URL }}"
