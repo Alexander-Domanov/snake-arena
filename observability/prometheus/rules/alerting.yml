@@ -1,0 +1,37 @@
+# Alerting rules for Interview Canvas (Module 4).
+#
+# The alert is designed to represent real user impact: repeated canvas
+# element creation failures (a user trying to add a sticky note / shape and
+# getting errors). It fires only when the failure rate stays above zero for
+# two minutes, so a single blip does not page anyone.
+#
+# Labels/annotations carry everything an on-call engineer needs: service,
+# environment, deployed version, owner, and the Grafana dashboard URL.
+
+groups:
+  - name: canvas
+    rules:
+      - alert: CanvasElementCreationFailures
+        expr: rate(canvas_element_creation_failures_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          owner: alexander-domanov
+        annotations:
+          summary: >-
+            Repeated canvas element creation failures on
+            {{ $labels.deployment_environment }}
+          description: >-
+            Elements are failing to be created at a sustained rate
+            (service {{ $labels.service_name }}, version
+            {{ $labels.service_version }}, environment
+            {{ $labels.deployment_environment }}, reason
+            {{ $labels.reason }}). Users cannot add stickies/shapes.
+            Investigate the root cause, fix the smallest correction, run the
+            backend tests and commit.
+          service: "{{ $labels.service_name }}"
+          environment: "{{ $labels.deployment_environment }}"
+          version: "{{ $labels.service_version }}"
+          owner: alexander-domanov
+          dashboard: >-
+            http://localhost:3000/d/canvas-overview?var-environment={{ $labels.deployment_environment }}&var-version={{ $labels.service_version }}

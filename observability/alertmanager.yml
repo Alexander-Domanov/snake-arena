@@ -1,0 +1,18 @@
+# Minimal Alertmanager config: accept alerts from Prometheus, keep them in
+# the API (the on-call-engineer poller reads /api/v2/alerts) and log them.
+route:
+  receiver: "noop"
+  group_by: ["alertname"]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+
+receivers:
+  - name: "noop"
+    # No real notification channel: this proof-of-concept relies on the
+    # on-call engineer polling the Alertmanager API every minute. In a real
+    # setup the receiver would be PagerDuty/Slack/e-mail and the poller would
+    # be an SNS->Lambda style trigger.
+    webhook_configs:
+      - url: http://localhost:9093/__noop
+        send_resolved: true

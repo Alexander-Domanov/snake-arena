@@ -1,0 +1,56 @@
+# OpenTelemetry Collector configuration for Interview Canvas.
+#
+# One collector in the middle of everything: the app exports OTLP over HTTP
+# (:4318) / gRPC (:4317); the collector fans telemetry out to:
+#   - Prometheus (metrics) via its own /metrics scrape endpoint (:8889)
+#   - Tempo      (traces)  via OTLP gRPC
+#   - Loki       (logs)    via OTLP HTTP
+# Resource attributes (service.name / service.version /
+# deployment.environment) are kept as labels on every signal.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 2s
+    send_batch_size: 128
+
+exporters:
+  debug:
+    verbosity: basic
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    # Append Prometheus suffixes (_total for counters) so dashboards and
+    # alert rules use idiomatic metric names.
+    add_metric_suffixes: true
+    resource_to_telemetry_conversion:
+      enabled: true
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo, debug]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus, debug]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/loki, debug]

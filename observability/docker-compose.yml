@@ -1,0 +1,107 @@
+# Observability stack for Interview Canvas (Module 4).
+#
+# A SEPARATE compose project from the application stack (docker-compose.yml in
+# the repo root): this stack collects telemetry from any number of app
+# instances (local dev, staging, production) via one OpenTelemetry Collector.
+#
+#   app (OTLP) ──► otel-collector ──┬──► Prometheus   (metrics, scraped on :8889)
+#                                   ├──► Tempo        (traces, OTLP gRPC)
+#                                   ├──► Loki         (logs, OTLP HTTP)
+#                                   └──► (debug console)
+#   Prometheus ── alerts ──► Alertmanager ──► on-call-engineer poller (API :9093)
+#   Grafana :3000 reads Prometheus (:9090) / Tempo (:3200) / Loki (:3100)
+#
+# Run from the repo root:
+#   docker compose -f observability/docker-compose.yml up -d --build
+# Point the app at it:
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 uv run uvicorn ...
+#
+# Endpoints (local):
+#   Grafana      http://localhost:3000   (admin / admin)
+#   Prometheus   http://localhost:9090
+#   Alertmanager http://localhost:9093
+#   Collector    OTLP http://localhost:4318, OTLP gRPC localhost:4317
+#   Loki         http://localhost:3100
+#   Tempo        http://localhost:3200
+
+name: interview-canvas-observability
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.106.1
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:2.5.0
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"   # Tempo query/HTTP (OTLP gRPC stays internal on :4317)
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.2.0
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml:ro
+    ports:
+      - "3100:3100"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    restart: unless-stopped
+
+volumes:
+  tempo-data:
+  grafana-data:

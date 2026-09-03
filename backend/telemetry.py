@@ -59,24 +59,23 @@ _ACTIVE_SYNC_INTERVAL_SECONDS = 30
 _meter = metrics.get_meter(SERVICE_NAME, SERVICE_VERSION)
 
 # --- instruments (no-op unless a MeterProvider is installed) ---
+# No `unit` on purpose: the OTel Collector's Prometheus exporter appends unit
+# suffixes (e.g. _elements) to metric names, which makes dashboards and alert
+# rules fragile. Without units the exported names equal the names below.
 boards_created = _meter.create_counter(
     "canvas_boards_created",
-    unit="boards",
     description="Interview rooms (boards) created",
 )
 elements_created = _meter.create_counter(
     "canvas_elements_created",
-    unit="elements",
     description="Canvas elements created",
 )
 element_creation_failures = _meter.create_counter(
     "canvas_element_creation_failures",
-    unit="elements",
     description="Canvas element creation failures",
 )
 active_boards = _meter.create_up_down_counter(
     "canvas_active_boards",
-    unit="boards",
     description="Boards with API activity in the last 5 minutes (approximate)",
 )
 
@@ -182,6 +181,9 @@ def setup_telemetry(app=None, engine=None) -> bool:
         log_provider.add_log_record_processor(
             BatchLogRecordProcessor(OTLPLogExporter(endpoint=f"{endpoint}/v1/logs"))
         )
+        # uvicorn leaves the root logger at WARNING, which would silently drop
+        # INFO records before they reach the handler below.
+        logging.getLogger().setLevel(logging.INFO)
         logging.getLogger().addHandler(
             LoggingHandler(level=logging.INFO, logger_provider=log_provider)
         )
