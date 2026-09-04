@@ -144,3 +144,22 @@ def test_patch_missing_element_404(client):
     r = update_element(client, MISSING_UUID, x=1)
     assert r.status_code == 404
     assert r.json()["detail"] == "Element not found"
+
+
+def test_delete_board_cascades_on_postgres(client):
+    """Deleting a board removes it and its elements, persisted on real Postgres."""
+    bid = create_board(client, "to delete").json()["id"]
+    sticky = add_element(
+        client, bid, type="sticky_note", x=10, y=20, width=160, height=160, text="cascade me"
+    ).json()
+    rect = add_element(client, bid, type="rectangle", x=30, y=40, width=180, height=110).json()
+
+    # both elements exist before the deletion
+    data = client.get(f"/boards/{bid}").json()
+    assert [e["type"] for e in data["elements"]] == ["sticky_note", "rectangle"]
+
+    # deleting the board removes it, and its elements are gone with it
+    assert client.delete(f"/boards/{bid}").status_code == 204
+    assert client.get(f"/boards/{bid}").status_code == 404
+    assert client.delete(f"/elements/{sticky['id']}").status_code == 404
+    assert client.delete(f"/elements/{rect['id']}").status_code == 404

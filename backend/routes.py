@@ -1,4 +1,4 @@
-"""API routes — exactly the five endpoints from openapi.yaml."""
+"""API routes — exactly the six data endpoints from openapi.yaml (plus /healthz)."""
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -35,6 +35,16 @@ def get_board(board_id: uuid.UUID, db: Session = Depends(get_db)) -> models.Boar
     board = services.get_board(db, str(board_id))
     telemetry.record_board_activity(str(board.id))
     return board
+
+
+@router.delete(
+    "/boards/{board_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a board",
+)
+def delete_board(board_id: uuid.UUID, db: Session = Depends(get_db)) -> Response:
+    services.delete_board(db, str(board_id))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

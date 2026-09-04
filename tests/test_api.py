@@ -219,6 +219,44 @@ def test_delete_element_invalid_uuid_422(client):
     assert r.status_code == 422
 
 
+# ---- DELETE /boards/{board_id} ----
+
+def test_delete_board_204(client):
+    board_id = create_board(client).json()["id"]
+    r = client.delete(f"/boards/{board_id}")
+    assert r.status_code == 204
+    assert r.content == b""
+
+
+def test_delete_board_cascades_elements(client):
+    board_id = create_board(client).json()["id"]
+    e1 = add_element(client, board_id, type="sticky_note", x=10, y=20, text="a").json()["id"]
+    e2 = add_element(client, board_id, type="circle", x=50, y=60).json()["id"]
+    assert len(client.get(f"/boards/{board_id}").json()["elements"]) == 2
+    assert client.delete(f"/boards/{board_id}").status_code == 204
+    assert client.get(f"/boards/{board_id}").status_code == 404
+    # cascade is real at the API layer: the elements are gone too
+    for element_id in (e1, e2):
+        assert client.delete(f"/elements/{element_id}").status_code == 404
+
+
+def test_delete_board_404(client):
+    r = client.delete(f"/boards/{MISSING_UUID}")
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Board not found"
+
+
+def test_delete_board_twice_404(client):
+    board_id = create_board(client).json()["id"]
+    assert client.delete(f"/boards/{board_id}").status_code == 204
+    assert client.delete(f"/boards/{board_id}").status_code == 404
+
+
+def test_delete_board_invalid_uuid_422(client):
+    r = client.delete("/boards/not-a-uuid")
+    assert r.status_code == 422
+
+
 # ---- GET /healthz ----
 
 def test_healthz_ok(client):
