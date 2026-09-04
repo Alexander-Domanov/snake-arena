@@ -4,7 +4,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.141-green)
 ![SQLite](https://img.shields.io/badge/SQLite-3-blue)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-green)
-![pytest](https://img.shields.io/badge/tests-48%20passed-brightgreen)
+![pytest](https://img.shields.io/badge/tests-55%20passed-brightgreen)
 ![frontend tests](https://img.shields.io/badge/frontend%20tests-15%20passed-brightgreen)
 ![Docker](https://img.shields.io/badge/Docker-multi--stage-blue)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-green)](.github/workflows/ci.yml)
@@ -13,16 +13,14 @@
 [![DataTalks.Club](https://img.shields.io/badge/DataTalks.Club-AI%20Dev%20Tools%20Zoomcamp%202026-purple)](https://github.com/DataTalksClub/ai-dev-tools-zoomcamp)
 
 Collaborative whiteboard for system design interviews: sticky notes and basic
-shapes on a shared board. This is the Module 3 deliverable — the Module 2
-full-stack app (static frontend + FastAPI backend over an OpenAPI contract,
-SQLite for local dev) proven by unit/integration/E2E tests, packaged in a
-container, checked by CI on every pull request, and deployed to staging
-(development) and production on Render — staging automatically on merge to
-`main`, production via manual promotion. Since Module 4 the backend is
-instrumented with OpenTelemetry (metrics, traces, logs) and the repo ships a
-local observability stack (Prometheus / Loki / Tempo / Grafana) plus a
-Prometheus alert and an on-call-engineer poller that hands firing alerts to a
-headless coding agent.
+shapes on a shared board. Built across the AI Dev Tools Zoomcamp 2026 modules:
+a Module 2 full-stack app (static frontend + FastAPI backend over an OpenAPI
+contract, SQLite for local dev) hardened in Module 3 (unit/integration/E2E
+tests, container, CI, deploy) and extended in Module 4 — dev/prod deployment
+(staging automatically on merge to `main`, production via manual promotion),
+OpenTelemetry instrumentation (metrics, traces, logs), a local observability
+stack (Prometheus / Loki / Tempo / Grafana) with a Prometheus alert, and an
+on-call-engineer poller that hands firing alerts to a headless coding agent.
 
 ## Repository layout
 
@@ -37,7 +35,7 @@ tests/                   pytest unit/API + integration (real Postgres) + fronten
 e2e/                     Playwright E2E tests against the docker-compose stack
 Dockerfile               multi-stage image (uv stage + runtime, no Node stage)
 docker-compose.yml       local full stack: Postgres + app with healthchecks
-.github/workflows/       ci.yml (every PR) and deploy.yml (push to main → staging → production)
+.github/workflows/       ci.yml (every PR) and deploy.yml (push to main → staging; production via manual promotion)
 render.yaml              Render Blueprint: web service + managed Postgres
 observability/           local OTel stack (separate compose project): collector, Prometheus, Loki, Tempo, Grafana, Alertmanager
 on-call-engineer/        Alertmanager poller that wakes a headless coding agent on firing alerts
@@ -265,7 +263,7 @@ Module 4 (dev/prod, observability, on-call):
 All steps were verified by running the app locally and passing the CI suites
 (unit, integration against Postgres, E2E on the compose stack).
 
-📚 Course materials and module requirements: [Module 3 README](https://github.com/DataTalksClub/ai-dev-tools-zoomcamp/blob/main/03-deployment/README.md)
+📚 Course materials and module requirements: [Module 3 README](https://github.com/DataTalksClub/ai-dev-tools-zoomcamp/blob/main/03-deployment/README.md), [Module 4 README](https://github.com/DataTalksClub/ai-dev-tools-zoomcamp/blob/main/04-devops/README.md)
 
 ## API contract
 
