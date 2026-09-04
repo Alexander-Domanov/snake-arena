@@ -1,6 +1,6 @@
 # AI Usage Report — Interview Canvas
 
-Date: 2026-08-31 (Modules 1–2); updated 2026-09-02 (Module 3); updated 2026-09-03 (Module 4); updated 2026-09-04 (Module 4 finalize)
+Date: 2026-08-31 (Modules 1–2); updated 2026-09-02 (Module 3); updated 2026-09-03 (Module 4); updated 2026-09-04 (Module 4 finalize); updated 2026-09-04 (Module 5)
 Project: Interview Canvas — collaborative whiteboard for system design interviews
 Stack: HTML/CSS/JS (frontend), FastAPI + SQLAlchemy (backend), OpenAPI 3.0, pytest, uv, Docker, GitHub Actions, Render
 
@@ -350,6 +350,45 @@ Final decisions closing Module 4:
   (https://interview-canvas-staging.onrender.com — app loads, `/healthz` ok).
 
 Module 4 is complete.
+
+### 8.7 Module 5 — Agent Extension Pack, 2026-09-04
+
+Work done against the Module 5 deliverable (agent extension pack: skills,
+subagents, MCP, guardrails, plugin, permissions note). All artifacts live on
+branch `module5/agent-extension-pack`; each step verified by real runs.
+
+| Stage | AI role | Result |
+|-------|---------|--------|
+| Skills | Authored the two reusable procedures the project actually repeats | `.agents/skills/contract-first-feature` (API feature end-to-end, with repo pitfalls) and `review-api-change` (QA review, PASS/FAIL with file:line) |
+| Subagent | Authored an isolated QA role definition | `.agents/agents/api-reviewer.md` (read-only by role; reports PASS/FAIL) |
+| MCP server | Designed and implemented a scoped tool server | `mcp-server/server.py`: 4 tools (contract file, live /openapi.json, /healthz, demo create-board); pure stdlib JSON-RPC over stdio — zero new dependencies |
+| Guardrail | Turned the AGENTS.md contract-first rule into an enforced hook | `agent-hooks/check_contract_sync.py` (backend without openapi.yaml → blocks commit) + pre-commit installer; installed and fired on real commits |
+| Plugin package | Packaged the capabilities for sharing | `plugins/ai-devtools-agent-pack/`: manifest (`plugin.yaml`) + non-destructive installers for Claude Code / Hermes |
+| Permissions note | Documented the security boundaries | `docs/permissions.md` (capability matrix, MCP no-secrets/no-auth localhost-only, demo mutation) |
+| Agentic demo | Orchestrated a real feature through the pack | `DELETE /boards/{board_id}` shipped: implementer subagent (skill-driven) → api-reviewer subagent → MCP calls on a live instance → guardrail on commit. `docs/demo.md` records the actual run |
+
+Bugs/lessons found during the module:
+
+1. **Subagent self-reports are not verification** — the implementer's summary
+   was re-verified by the orchestrator (git diff, ruff, pytest) before
+   acceptance; the reviewer's findings were checked against the actual diff.
+2. **The QA loop produced a real fix** — reviewer finding (cascade covered
+   only at the board-404 level in the unit test) was acted on before merge:
+   the test now asserts deleted elements return 404 too.
+3. **Stdlib-only MCP server** — implementing JSON-RPC over stdio by hand
+   (initialize/tools/list/tools/call) kept `pyproject.toml` unchanged and the
+   protocol fully unit-tested (including a real subprocess exchange).
+4. **Guardrails beat rules** — the contract-sync pre-commit hook ran on every
+   feature commit and passed only because the contract and backend were
+   staged together, i.e. it enforced the AGENTS.md rule at the point of
+   action.
+5. **Environment honesty** — no headless agent CLI is installed locally, so
+   the demo roles were Hermes subagents and the MCP step was driven by a
+   protocol client; `docs/demo.md` states this instead of pretending a
+   codex/claude binary ran.
+6. **Blocked write to AGENTS.md** (protected agent-instruction file) — the
+   Module 5 commands/documents sync needs explicit human approval and is
+   applied separately from the main PR when approved.
 
 ---
 

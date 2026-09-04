@@ -4,7 +4,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.141-green)
 ![SQLite](https://img.shields.io/badge/SQLite-3-blue)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-green)
-![pytest](https://img.shields.io/badge/tests-55%20passed-brightgreen)
+![pytest](https://img.shields.io/badge/tests-81%20passed-brightgreen)
 ![frontend tests](https://img.shields.io/badge/frontend%20tests-15%20passed-brightgreen)
 ![Docker](https://img.shields.io/badge/Docker-multi--stage-blue)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-green)](.github/workflows/ci.yml)
@@ -21,6 +21,9 @@ tests, container, CI, deploy) and extended in Module 4 — dev/prod deployment
 OpenTelemetry instrumentation (metrics, traces, logs), a local observability
 stack (Prometheus / Loki / Tempo / Grafana) with a Prometheus alert, and an
 on-call-engineer poller that hands firing alerts to a headless coding agent.
+Module 5 wraps the workflow itself in an agent extension pack — reusable
+skills, a specialized subagent, a scoped MCP server, guardrails and a plugin
+package (see `docs/agent-extension-pack.md`).
 
 ## Repository layout
 
@@ -39,6 +42,10 @@ docker-compose.yml       local full stack: Postgres + app with healthchecks
 render.yaml              Render Blueprint: web service + managed Postgres
 observability/           local OTel stack (separate compose project): collector, Prometheus, Loki, Tempo, Grafana, Alertmanager
 on-call-engineer/        Alertmanager poller that wakes a headless coding agent on firing alerts
+.agents/                 Module 5 agent extension pack: reusable skills + subagents (SKILL.md format)
+agent-hooks/             pre-commit guardrails: contract-sync check + installer
+mcp-server/              MCP server with scoped canvas tools (stdlib, JSON-RPC over stdio)
+plugins/                 ai-devtools-agent-pack: shareable plugin manifest + installers
 docs/                    testing/deployment/release-process docs, AI usage report, screenshots
 ```
 
@@ -260,10 +267,30 @@ Module 4 (dev/prod, observability, on-call):
     the alert fired, and the agent found the root cause, fixed it, ran the
     tests and committed.
 
+Module 5 (agent extension pack):
+
+17. **Reusable skills** – `.agents/skills/contract-first-feature` (implement an
+    API feature contract-first: openapi.yaml → backend → tests → checks) and
+    `.agents/skills/review-api-change` (QA review, PASS/FAIL with file:line
+    evidence).
+18. **Specialized subagent** – `.agents/agents/api-reviewer.md`: isolated QA
+    role that applies the review skill without editing code.
+19. **MCP server** – `mcp-server/server.py`: scoped tools over the contract
+    and a running instance (pure stdlib, JSON-RPC over stdio — no new
+    dependencies).
+20. **Guardrails** – `agent-hooks/check_contract_sync.py` blocks commits where
+    `backend/` drifts from `openapi.yaml` (pre-commit installer included).
+21. **Plugin package** – `plugins/ai-devtools-agent-pack/` carries skills,
+    agents, guardrails and the MCP command across projects and agent tools.
+22. **Agentic demo** – a real feature (`DELETE /boards/{board_id}`, element
+    cascade) shipped through the pack: implementer subagent (skill-driven) →
+    api-reviewer subagent (PASS, one coverage finding fixed) → MCP calls on a
+    live instance → pre-commit guardrail; recorded in `docs/demo.md`.
+
 All steps were verified by running the app locally and passing the CI suites
 (unit, integration against Postgres, E2E on the compose stack).
 
-📚 Course materials and module requirements: [Module 3 README](https://github.com/DataTalksClub/ai-dev-tools-zoomcamp/blob/main/03-deployment/README.md), [Module 4 README](https://github.com/DataTalksClub/ai-dev-tools-zoomcamp/blob/main/04-devops/README.md)
+📚 Course materials and module requirements: [Module 3 README](https://github.com/DataTalksClub/ai-dev-tools-zoomcamp/blob/main/03-deployment/README.md), [Module 4 README](https://github.com/DataTalksClub/ai-dev-tools-zoomcamp/blob/main/04-devops/README.md), [Module 5 README](https://github.com/DataTalksClub/ai-dev-tools-zoomcamp/blob/main/05-agent-capabilities/README.md)
 
 ## API contract
 
