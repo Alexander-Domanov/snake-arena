@@ -6,7 +6,7 @@ green pipeline means the app actually works, not just that it imports.
 
 | Layer | What it verifies | Environment | Runs in CI |
 |-------|------------------|-------------|------------|
-| Lint | ruff (E/F/W/I/UP/B rules) over backend, tests, e2e, alembic | uv | `lint` job |
+| Lint | ruff (E/F/W/I/UP/B rules) over backend, tests, e2e, alembic, on-call-engineer | uv | `lint` job |
 | Backend unit tests | models, pydantic schemas, DB helpers | in-memory SQLite | `backend-unit` job |
 | API integration tests | the 5 endpoints over the real FastAPI app | in-memory SQLite (dependency override) | `backend-unit` job |
 | Frontend tests | contract behavior of `app.js` (payloads, reloads, PATCH persistence, error handling) | jsdom + node:test | `frontend` job |
