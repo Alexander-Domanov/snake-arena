@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
       - name: Run ruff check
-        run: uv run ruff check backend tests e2e alembic on-call-engineer
+        run: uv run ruff check backend tests e2e alembic on-call-engineer mcp-server agent-hooks
 
   backend-unit:
     name: Backend unit tests
