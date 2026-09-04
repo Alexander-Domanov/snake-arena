@@ -51,6 +51,15 @@ npm test
   `openapi.yaml`): create a board on load, add/delete elements with correct
   payloads, reload after mutations, `?board=<id>` join flow, PATCH persistence
   (text on blur, position on pointerup, no-PATCH guards), error handling.
+- `tests/test_mcp_server.py` — MCP server (`mcp-server/server.py`): JSON-RPC
+  dispatch (initialize/ping/tools/list/tools/call, notifications ignored),
+  tool behaviour (contract scanner over the real `openapi.yaml`, clean errors
+  for unreachable instances), and a real stdio subprocess protocol run.
+- `tests/test_agent_hooks.py` — guardrail logic (`check_contract_sync`):
+  backend change without `openapi.yaml` fails; contract-only edit warns;
+  docs/tests-only passes.
+- `tests/test_agent_pack_manifest.py` — plugin manifest integrity: every
+  declared source path, installer and MCP command exists in the repo.
 - `tests/integration/` — real Postgres: Alembic migrations apply cleanly
   (`test_migrations.py`), CRUD + PATCH updates persist and survive reconnects
   (`test_crud_postgres.py`: text-only, position-only, both fields, clear-null,
