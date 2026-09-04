@@ -243,8 +243,9 @@ Module 4 (dev/prod, observability, on-call):
 
 13. **Dev/prod promotion** – every push deploys staging (development);
     production is promoted manually (workflow_dispatch + staging-health
-    guard). Container-registry migration (GHCR, image tags, imgURL deploys)
-    is prepared in a separate PR (awaits Render dashboard steps).
+    guard). A container-registry migration (GHCR, image tags, imgURL
+    deploys) was prepared and then closed without merge — Git-based deploys
+    fully cover the dev/prod model; GHCR is deferred (can be revisited).
 14. **OpenTelemetry** – `backend/telemetry.py` exports metrics/traces/logs
     over OTLP (inert without `OTEL_EXPORTER_OTLP_ENDPOINT`); application
     metrics: boards created, elements created by type, creation failures by

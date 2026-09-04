@@ -1,6 +1,6 @@
 # AI Usage Report — Interview Canvas
 
-Date: 2026-08-31 (Modules 1–2); updated 2026-09-02 (Module 3); updated 2026-09-03 (Module 4)
+Date: 2026-08-31 (Modules 1–2); updated 2026-09-02 (Module 3); updated 2026-09-03 (Module 4); updated 2026-09-04 (Module 4 finalize)
 Project: Interview Canvas — collaborative whiteboard for system design interviews
 Stack: HTML/CSS/JS (frontend), FastAPI + SQLAlchemy (backend), OpenAPI 3.0, pytest, uv, Docker, GitHub Actions, Render
 
@@ -295,7 +295,7 @@ container registry, OpenTelemetry, dashboards, alerting, AI on-call).
 | Stage | AI role | Result |
 |-------|---------|--------|
 | Dev/prod promotion | Researched current deploy.yml, rewrote to dev-auto/prod-manual | PR #7: push → staging only; production via workflow_dispatch with staging-health guard; docs synced |
-| Registry decision | Read Render docs (deploying-an-image, deploy hooks `imgURL`, API) to choose GHCR path with facts | PR #8 (open): build-once → GHCR `YYYYMMDD-HHMMSS-sha` tags → imgURL deploys; **blocked on human dashboard migration** |
+| Registry decision | Read Render docs (deploying-an-image, deploy hooks `imgURL`, API) to choose GHCR path with facts | PR #8: build-once → GHCR `YYYYMMDD-HHMMSS-sha` tags → imgURL deploys; **closed without merge 2026-09-04** — Git-based deploys kept, GHCR deferred |
 | OTel instrumentation | Designed `backend/telemetry.py` (env-gated, resource labels), wired counters into routes | Metrics/traces/logs export over OTLP; 6 new unit tests |
 | Observability stack | Wrote `observability/` compose project + provisioning | Collector → Prometheus/Loki/Tempo; Grafana dashboard w/ env+version filters; Alertmanager; verified e2e locally |
 | Alerting | Wrote Prometheus alert rule (sustained failures, annotated with service/env/version/owner/dashboard) | Alert fires → Alertmanager active (verified with generated failures) |
@@ -321,10 +321,35 @@ Bugs/lessons found during the module:
    absent) — the on-call role in the demo was executed by a Hermes subagent
    with the same brief the poller would give a CLI agent.
 
-Human steps still required (platform accounts): Render dashboard migration
-for PR #8 (GHCR registry credential, two image-backed services, hook URLs),
-deploying/choosing a managed observability backend for staging+production,
-and final cleanup of temporary Render resources.
+Deferred by decision (2026-09-04): the GHCR registry migration — PR #8 was
+closed without merge; Git-based Render deploys cover the dev/prod model (see
+section 8.6).
+
+Human steps still open (platform accounts): choosing/deploying a managed
+observability backend for staging+production, and final cleanup of temporary
+Render resources.
+
+### 8.6 Module 4 completed (Git-based deployment, observability stack available locally), 2026-09-04
+
+Final decisions closing Module 4:
+
+- **Deployment model: Git-based on Render, kept.** PR #8 (GHCR registry:
+  build once → `YYYYMMDD-HHMMSS-sha` tags → imgURL deploys) was closed
+  without merge. Staging auto-deploys on every push to `main`; production is
+  promoted manually with a staging-`/healthz` guard. This satisfies the
+  module's dev/prod goals; the registry migration is deferred and can be
+  revisited later.
+- **AGENTS.md updated** with commands for the observability stack and the
+  on-call poller (plus Documents rows), so future sessions know how to run
+  them; the ruff lint scope now includes `on-call-engineer/` (AGENTS.md and
+  CI in sync).
+- **Observability stack available locally** (`observability/` compose
+  project); telemetry is inert without `OTEL_EXPORTER_OTLP_ENDPOINT`, so the
+  app runs and deploys unchanged without the stack.
+- **Verified:** staging re-deployed and healthy
+  (https://interview-canvas-staging.onrender.com — app loads, `/healthz` ok).
+
+Module 4 is complete.
 
 ---
 

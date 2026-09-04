@@ -9,8 +9,11 @@
 - `uv run pytest -k delete` – run tests matching a keyword
 - `uv run pytest tests/integration` – run integration tests against real Postgres (start it with: `docker compose up -d db`)
 - `uv run pytest e2e` – run Playwright E2E tests (start the full stack with: `docker compose up -d --build`)
-- `uv run ruff check backend tests e2e alembic` – run the CI linter
+- `uv run ruff check backend tests e2e alembic on-call-engineer` – run the CI linter
 - `npm test` – run frontend tests (jsdom + node:test; `npm install` once)
+- `docker compose -f observability/docker-compose.yml up -d --build` – start the local observability stack (OTel Collector, Prometheus, Loki, Tempo, Grafana, Alertmanager); see `observability/README.md`
+- `docker compose -f observability/docker-compose.yml down -v` – stop the observability stack
+- `uv run on-call-engineer/poll.py --once` – dry-run the Alertmanager on-call poller; set `ONCALL_AGENT_CMD` (with `{prompt}`) to delegate real alerts to a headless agent; see `on-call-engineer/README.md`
 - `uv run python -m openapi_generator` – generate client (if needed)
 
 ## Rules
@@ -23,7 +26,7 @@
 - Keep SQLAlchemy models in `backend/models.py`, pydantic API schemas in `backend/schemas.py`, routes in `backend/routes.py`, services in `backend/services.py`.
 - Tests must cover both unit (models) and integration (API) layers.
 - `main` is protected: changes go through a PR, all CI checks must pass, direct pushes are blocked.
-- Lint with ruff before committing (`uv run ruff check backend tests e2e alembic`).
+- Lint with ruff before committing (`uv run ruff check backend tests e2e alembic on-call-engineer`).
 
 ## Documents
 
@@ -37,3 +40,5 @@
 - `backend/` – FastAPI backend code
 - `frontend/` – frontend static files
 - `tests/` – pytest tests
+- `observability/` – local OTel stack (separate compose project): collector, Prometheus, Loki, Tempo, Grafana, Alertmanager (`observability/README.md`)
+- `on-call-engineer/` – Alertmanager poller that hands firing alerts to a headless coding agent (`on-call-engineer/README.md`)
