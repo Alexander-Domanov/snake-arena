@@ -1,0 +1,33 @@
+# ai-devtools-agent-pack — plugin manifest (Module 5)
+
+# The Interview Canvas agent capabilities, packaged so they can move across
+# projects and agent tools. This file is the human/CI-readable manifest;
+# install.sh does the actual wiring.
+
+name: ai-devtools-agent-pack
+description: Interview Canvas agent capabilities — skills, subagents, guardrails, MCP server
+version: 1.0.0
+license: MIT
+
+provides:
+  skills:
+    - source: .agents/skills/contract-first-feature/SKILL.md
+      description: Implement an API feature contract-first (openapi.yaml -> backend -> tests -> checks)
+    - source: .agents/skills/review-api-change/SKILL.md
+      description: QA review of an API change, PASS/FAIL with file:line evidence
+  agents:
+    - source: .agents/agents/api-reviewer.md
+      description: Isolated QA subagent that applies review-api-change
+  guardrails:
+    - source: agent-hooks/check_contract_sync.py
+      description: Block commits where backend/ drifts from openapi.yaml
+      installer: agent-hooks/install.sh
+  mcp:
+    - source: mcp-server/server.py
+      description: Scoped MCP tools over the Interview Canvas contract/runtime
+      command: uv run python mcp-server/server.py
+
+# Tool wiring performed by install.sh:
+#   Codex / OpenCode     - discover .agents/ at the repo root automatically
+#   Claude Code          - symlink .claude/skills + .claude/agents -> .agents/*
+#   Hermes Agent         - symlink/copy skills into ~/.hermes/skills
