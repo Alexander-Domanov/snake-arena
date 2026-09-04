@@ -120,6 +120,17 @@ paths:
                         created_at: '2026-08-31T10:16:18Z'
         '404':
           $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - boards
+      summary: Delete a board
+      description: Deletes the board and all elements on it. The board link stops working for all participants.
+      operationId: deleteBoard
+      responses:
+        '204':
+          description: Board deleted (no content)
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /boards/{board_id}/elements:
     post:

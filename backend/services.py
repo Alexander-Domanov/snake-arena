@@ -27,6 +27,14 @@ def get_board(db: Session, board_id: str) -> models.Board:
     return board
 
 
+def delete_board(db: Session, board_id: str) -> None:
+    board = db.get(models.Board, board_id)
+    if board is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
+    db.delete(board)
+    db.commit()
+
+
 def add_element(db: Session, board_id: str, payload: schemas.ElementCreate) -> models.Element:
     board = db.get(models.Board, board_id)
     if board is None:
